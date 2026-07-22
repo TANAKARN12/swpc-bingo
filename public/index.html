@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWPC BINGO ONLINE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background: #0f172a; }
+        .cell-marked { background: #10b981 !important; color: white !important; font-weight: bold; border-color: #059669 !important; }
+        .glow-text { text-shadow: 0 0 20px rgba(56, 189, 248, 0.6); }
+    </style>
+</head>
+<body class="text-white min-h-screen flex flex-col items-center justify-center p-3">
+
+    <div id="app" class="w-full max-w-md bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl p-5 border border-cyan-500/30 transition-all duration-300">
+        
+        <div id="header-brand" class="text-center mb-4">
+            <h1 class="text-2xl font-extrabold text-cyan-400">สภาวิชาชีพสังคมสงเคราะห์</h1>
+            <p class="text-xs text-slate-400">SWPC BINGO ONLINE</p>
+        </div>
+
+        <!-- STEP 1: หน้าลงทะเบียน -->
+        <div id="step-register">
+            <form id="form-register" class="space-y-3">
+                <div>
+                    <label class="block text-xs mb-1 text-slate-300">ชื่อ</label>
+                    <input type="text" id="input-name" required class="w-full bg-slate-700 border border-slate-600 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-400">
+                </div>
+                <div>
+                    <label class="block text-xs mb-1 text-slate-300">นามสกุล</label>
+                    <input type="text" id="input-surname" required class="w-full bg-slate-700 border border-slate-600 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-400">
+                </div>
+                <div>
+                    <label class="block text-xs mb-1 text-slate-300">หน่วยงาน / สังกัด</label>
+                    <input type="text" id="input-org" required class="w-full bg-slate-700 border border-slate-600 rounded-xl p-3 text-white focus:outline-none focus:border-cyan-400">
+                </div>
+                <button type="submit" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold py-3.5 rounded-xl shadow-lg text-lg mt-2 active:scale-95 transition">🎮 เข้าเล่นเกมบิงโก ➔</button>
+            </form>
+
+            <div class="mt-4 pt-4 border-t border-slate-700 text-center">
+                <button onclick="switchToViewerMode()" class="w-full bg-slate-700 hover:bg-slate-600 text-amber-400 font-bold py-3 rounded-xl border border-amber-400/30 text-sm transition">
+                    📺 เข้าชมหน้าจอกลาง (Display / Projector Mode)
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 2: เลือกการ์ด -->
+        <div id="step-select-card" class="hidden">
+            <h2 class="text-base font-bold text-center text-cyan-400 mb-3">เลือกการ์ดบิงโกของคุณ</h2>
+            <div id="card-grid" class="grid grid-cols-4 gap-2 max-h-80 overflow-y-auto p-1"></div>
+        </div>
+
+        <!-- STEP 3: หน้ากระดานเล่น 3x3 -->
+        <div id="step-game" class="hidden">
+            <div id="waiting-screen" class="text-center py-6">
+                <div class="inline-block bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-4">
+                    <span class="text-amber-400 text-base font-bold animate-pulse">⏳ กำลังรอแอดมินเริ่มเกม...</span>
+                </div>
+                <p class="text-xs text-slate-400 mb-2">ผู้เข้าร่วมในห้องขณะนี้:</p>
+                <div id="avatar-lobby" class="flex flex-wrap justify-center gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-700/50 max-h-48 overflow-y-auto"></div>
+            </div>
+
+            <div id="game-board-area" class="hidden">
+                <div class="bg-slate-900 p-3 rounded-2xl text-center mb-3 border border-cyan-500/30">
+                    <div class="text-xs text-slate-400">คำศัพท์ล่าสุดที่ออก</div>
+                    <div id="current-drawn-word" class="text-2xl md:text-3xl font-black text-amber-400 my-1">-</div>
+                </div>
+
+                <div id="bingo-board" class="grid grid-cols-3 gap-2 mb-4 w-full aspect-square"></div>
+
+                <button id="btn-bingo" onclick="claimBingo()" class="w-full bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-black py-4 rounded-2xl text-xl shadow-xl active:scale-95 transition">
+                    🎉 BINGO! 🎉
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 4: หน้าจอกลางสำหรับขึ้นจอใหญ่ / โปรเจกเตอร์ (DISPLAY MODE) -->
+        <div id="step-viewer" class="hidden text-center py-2 space-y-4">
+            <div class="flex justify-between items-center bg-slate-900 p-3 rounded-2xl border border-slate-700">
+                <span class="text-amber-400 text-sm font-bold flex items-center gap-2">📺 หน้าจอแสดงผลกลาง SWPC</span>
+                <div class="flex items-center space-x-3">
+                    <label class="flex items-center text-xs text-slate-300 cursor-pointer">
+                        <input type="checkbox" id="viewer-sound-toggle" checked class="mr-1 accent-cyan-500"> 🔊 อ่านเสียง
+                    </label>
+                </div>
+            </div>
+            
+            <div class="bg-gradient-to-b from-slate-900 to-slate-950 p-6 md:p-10 rounded-3xl border-2 border-cyan-500/40 shadow-2xl">
+                <div class="text-slate-400 text-sm md:text-lg font-bold mb-2 uppercase tracking-wider">คำศัพท์ล่าสุดที่ออก</div>
+                <div id="viewer-word" class="text-4xl md:text-7xl font-black text-amber-400 glow-text my-4 min-h-[100px] flex items-center justify-center">
+                    รอเริ่มเกม...
+                </div>
+            </div>
+
+            <div class="bg-slate-900 p-5 rounded-3xl border border-slate-800 text-left">
+                <div class="text-sm font-bold text-cyan-400 mb-3 flex justify-between">
+                    <span>📋 ประวัติคำศัพท์ที่ประกาศไปแล้ว</span>
+                    <span id="viewer-count" class="text-slate-400">0 คำ</span>
+                </div>
+                <div id="viewer-history" class="flex flex-wrap gap-2 text-sm max-h-48 overflow-y-auto p-1"></div>
+            </div>
+
+            <button onclick="location.reload()" class="text-xs text-slate-500 underline hover:text-slate-300">← กลับหน้าลงทะเบียน</button>
+        </div>
+
+    </div>
+
+<script>
+    const socket = io();
+    let playerData = {};
+    let myCard = null;
+    let drawnHistory = [];
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSynthSfx(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        let osc = audioCtx.createOscillator();
+        let gain = audioCtx.createGain();
+
+        if (type === 'pop') {
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(800, audioCtx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+        } else if (type === 'tada') {
+            const notes = [261.63, 329.63, 392.00, 523.25];
+            notes.forEach((freq, idx) => {
+                setTimeout(() => {
+                    let o = audioCtx.createOscillator();
+                    let g = audioCtx.createGain();
+                    o.type = 'sine';
+                    o.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                    g.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                    o.connect(g); g.connect(audioCtx.destination);
+                    o.start(); o.stop(audioCtx.currentTime + 0.4);
+                }, idx * 100);
+            });
+        }
+    }
+
+    socket.on('trigger-sfx', (type) => playSynthSfx(type));
+
+    document.getElementById('form-register').addEventListener('submit', (e) => {
+        e.preventDefault();
+        playerData.name = document.getElementById('input-name').value;
+        playerData.surname = document.getElementById('input-surname').value;
+        playerData.org = document.getElementById('input-org').value;
+        document.getElementById('step-register').classList.add('hidden');
+        document.getElementById('step-select-card').classList.remove('hidden');
+    });
+
+    function switchToViewerMode() {
+        document.getElementById('step-register').classList.add('hidden');
+        document.getElementById('header-brand').classList.add('hidden');
+        
+        const app = document.getElementById('app');
+        app.classList.remove('max-w-md');
+        app.classList.add('max-w-4xl');
+        
+        document.getElementById('step-viewer').classList.remove('hidden');
+    }
+
+    socket.on('init-data', (data) => {
+        drawnHistory = data.drawnWords || [];
+        renderCardSelection(data.cards);
+    });
+
+    socket.on('cards-updated', (cards) => renderCardSelection(cards));
+
+    function renderCardSelection(cards) {
+        const grid = document.getElementById('card-grid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        cards.forEach(c => {
+            const btn = document.createElement('button');
+            const isTaken = c.selectedBy !== null;
+            btn.className = `p-3 text-sm rounded-xl font-bold border transition ${isTaken ? 'bg-slate-700 border-slate-600 text-slate-500 cursor-not-allowed' : 'bg-slate-700 border-cyan-500 text-cyan-400 hover:bg-cyan-500 hover:text-slate-900'}`;
+            btn.innerText = `ใบที่ ${c.id}`;
+            btn.disabled = isTaken;
+            btn.onclick = () => socket.emit('register-player', { ...playerData, cardId: c.id });
+            grid.appendChild(btn);
+        });
+    }
+
+    socket.on('player-list-updated', (players) => {
+        const lobby = document.getElementById('avatar-lobby');
+        if (!lobby) return;
+        lobby.innerHTML = players.map(p => `
+            <div class="flex flex-col items-center bg-slate-800 p-2 rounded-lg border border-slate-700 min-w-[70px]">
+                <span class="text-2xl">${p.avatar || '👤'}</span>
+                <span class="text-[10px] text-slate-300 font-semibold mt-1 truncate max-w-[65px]">${p.name}</span>
+            </div>
+        `).join('');
+    });
+
+    socket.on('register-success', (data) => {
+        myCard = data.card;
+        document.getElementById('step-select-card').classList.add('hidden');
+        document.getElementById('step-game').classList.remove('hidden');
+    });
+
+    socket.on('game-started', () => {
+        document.getElementById('waiting-screen').classList.add('hidden');
+        document.getElementById('game-board-area').classList.remove('hidden');
+        renderBingoBoard();
+    });
+
+    function renderBingoBoard() {
+        const board = document.getElementById('bingo-board');
+        board.innerHTML = '';
+        myCard.forEach((row) => {
+            row.forEach((val) => {
+                const cell = document.createElement('button');
+                const isFree = val === "FREE";
+                cell.className = `w-full h-full text-xs sm:text-sm md:text-base font-extrabold p-1.5 flex items-center justify-center text-center rounded-2xl border-2 border-slate-600 bg-slate-700 text-slate-100 shadow transition ${isFree ? 'cell-marked' : ''}`;
+                cell.innerText = val;
+
+                cell.onclick = () => {
+                    if (isFree || drawnHistory.includes(val)) {
+                        cell.classList.toggle('cell-marked');
+                        playSynthSfx('pop');
+                    } else {
+                        Swal.fire({ icon: 'warning', title: 'ยังไม่ออก!', text: `คำว่า "${val}" ยังไม่ได้ประกาศครับ`, timer: 1500, showConfirmButton: false });
+                    }
+                };
+                board.appendChild(cell);
+            });
+        });
+    }
+
+    socket.on('word-drawn', (data) => {
+        drawnHistory = data.history;
+        
+        const pWord = document.getElementById('current-drawn-word');
+        if (pWord) pWord.innerText = data.word;
+
+        const vWord = document.getElementById('viewer-word');
+        if (vWord) vWord.innerText = data.word;
+
+        const vCount = document.getElementById('viewer-count');
+        if (vCount) vCount.innerText = `${data.history.length} คำ`;
+
+        const vHist = document.getElementById('viewer-history');
+        if (vHist) {
+            vHist.innerHTML = data.history.map(w => `<span class="bg-cyan-500/20 border border-cyan-500 text-cyan-300 px-3 py-1 rounded-xl font-bold">${w}</span>`).join('');
+        }
+
+        const soundEnabled = document.getElementById('viewer-sound-toggle')?.checked;
+        if (data.playSound && soundEnabled) {
+            speakThai(data.word);
+        }
+    });
+
+    function speakThai(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'th-TH';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    function claimBingo() {
+        socket.emit('claim-bingo');
+    }
+
+    // หน้าจอของผู้บิงโกเอง ให้ขึ้นจุดพลุ + ฟอร์มกรอกที่อยู่
+    socket.on('bingo-verified-winner', (data) => {
+        confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+
+        Swal.fire({
+            title: '🎉 ยินดีด้วย คุณ BINGO สำเร็จ!',
+            text: 'กรุณากรอกข้อมูลที่อยู่สำหรับจัดส่งของรางวัล:',
+            html:
+                '<input id="swal-phone" class="swal2-input" placeholder="เบอร์โทรศัพท์ติดต่อ">' +
+                '<textarea id="swal-address" class="swal2-textarea" placeholder="ที่อยู่จัดส่งของรางวัลอย่างละเอียด"></textarea>',
+            focusConfirm: false,
+            confirmButtonText: 'ส่งข้อมูลรับของรางวัล 📦',
+            confirmButtonColor: '#10b981',
+            allowOutsideClick: false,
+            preConfirm: () => {
+                const phone = document.getElementById('swal-phone').value;
+                const address = document.getElementById('swal-address').value;
+                if (!phone || !address) {
+                    Swal.showValidationMessage('กรุณากรอกเบอร์โทรและที่อยู่ให้ครบถ้วนครับ');
+                }
+                return { phone, address };
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                socket.emit('submit-winner-info', result.value);
+                Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลเรียบร้อย!', text: 'ทางสภาวิชาชีพฯ จะทำการจัดส่งของรางวัลให้ท่านครับ' });
+            }
+        });
+    });
+
+    // หน้าผู้รับชม (Display) และ ผู้เล่นคนอื่น จะเห็นป๊อบอัพประกาศทันทีเมื่อมีคนบิงโก
+    socket.on('bingo-alert-broadcast', (data) => {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        playSynthSfx('tada');
+        
+        Swal.fire({
+            icon: 'success',
+            title: '🎉 มีผู้ BINGO แล้ว!',
+            html: `<b style="font-size: 24px; color: #10b981;">${data.name}</b><br><span style="color: #cbd5e1;">หน่วยงาน: ${data.org} (การ์ดใบที่ ${data.cardId})</span>`,
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'ยินดีด้วย! 👏'
+        });
+    });
+
+    socket.on('bingo-rejected', (msg) => {
+        Swal.fire({ icon: 'error', title: 'ยังไม่ บิงโก!', text: msg, confirmButtonColor: '#ef4444' });
+    });
+
+    socket.on('game-reset', () => location.reload());
+</script>
+</body>
+</html>

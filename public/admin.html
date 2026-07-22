@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - SWPC BINGO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <style> 
+        body { font-family: 'Sarabun', sans-serif; background-color: #0b1329; } 
+    </style>
+</head>
+<body class="text-slate-100 p-4 md:p-8 min-h-screen">
+
+    <div class="max-w-6xl mx-auto space-y-6">
+        
+        <!-- Header -->
+        <div class="flex flex-col md:flex-row justify-between items-center bg-slate-900/90 p-6 rounded-3xl border border-cyan-500/30 shadow-2xl backdrop-blur-md">
+            <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                <div class="w-14 h-14 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center text-3xl shadow-lg">
+                    🎛️
+                </div>
+                <div>
+                    <h1 class="text-2xl md:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-400">
+                        แผงควบคุมคณะกรรมการกลาง SWPC
+                    </h1>
+                    <p class="text-xs md:text-sm text-slate-400">ระบบควบคุมการจัดกิจกรรมบิงโกออนไลน์ สภาวิชาชีพสังคมสงเคราะห์</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <span class="text-sm font-semibold text-slate-400">สถานะ:</span>
+                <span id="badge-status" class="bg-amber-500/20 text-amber-400 border border-amber-500/40 px-4 py-1.5 rounded-full text-xs font-bold animate-pulse">
+                    ⏳ ยังไม่เริ่มเกม
+                </span>
+            </div>
+        </div>
+
+        <!-- แถบปุ่มสั่งการหลัก -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <button onclick="startGame()" class="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-slate-950 font-black py-4 px-6 rounded-2xl text-lg shadow-xl hover:shadow-emerald-500/20 transition active:scale-95 flex items-center justify-center gap-2">
+                ▶ เริ่มเกม (Start Game)
+            </button>
+            <button onclick="resetGame()" class="bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-700 hover:to-red-800 text-white font-bold py-4 px-6 rounded-2xl text-lg shadow-xl hover:shadow-rose-600/20 transition active:scale-95 flex items-center justify-center gap-2">
+                🔄 รีเซ็ตระบบเกมใหม่ (Reset All)
+            </button>
+        </div>
+
+        <!-- ส่วนควบคุมคำศัพท์ & ระบบเสียง -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            
+            <!-- การ์ดเลือกและประกาศคำศัพท์ (2 Cols) -->
+            <div class="lg:col-span-2 bg-slate-900/80 p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
+                <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-800 pb-4">
+                    <h2 class="text-xl font-bold text-amber-400 flex items-center gap-2">
+                        📢 ประกาศคำศัพท์สุ่มได้
+                    </h2>
+                    <label class="flex items-center text-xs text-slate-300 cursor-pointer bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700 transition">
+                        <input type="checkbox" id="chk-sound" checked class="w-4 h-4 accent-cyan-500 mr-2"> 🔊 เปิดเสียงอ่านไทยอัตโนมัติ
+                    </label>
+                </div>
+
+                <div class="flex flex-col sm:flex-row gap-3">
+                    <select id="select-word" class="bg-slate-800 border-2 border-cyan-500/40 rounded-xl px-4 py-3.5 text-base font-bold text-cyan-300 w-full focus:outline-none focus:border-cyan-400 transition">
+                        <option value="">-- เลือกคำศัพท์จากรายการ --</option>
+                    </select>
+                    <button onclick="drawSelectedWord()" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black px-6 py-3.5 rounded-xl text-base shadow-lg hover:shadow-cyan-500/30 transition whitespace-nowrap active:scale-95">
+                        ประกาศคำนี้ 📢
+                    </button>
+                    <button onclick="drawRandomWord()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-5 py-3.5 rounded-xl text-base shadow-lg transition whitespace-nowrap active:scale-95">
+                        🎲 สุ่มอัตโนมัติ
+                    </button>
+                </div>
+
+                <div>
+                    <div class="text-xs font-bold text-slate-400 mb-2">ประวัติคำศัพท์ที่ประกาศไปแล้ว (<span id="drawn-count">0</span> คำ):</div>
+                    <div id="admin-history" class="flex flex-wrap gap-2 max-h-36 overflow-y-auto p-3 bg-slate-950/60 rounded-2xl border border-slate-800/80 min-h-[60px]">
+                        <span class="text-xs text-slate-600 italic">ยังไม่มีการประกาศคำศัพท์</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- การ์ดแผงเปิด Sound Effects (1 Col) -->
+            <div class="bg-slate-900/80 p-6 rounded-3xl border border-slate-800 shadow-xl flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xl font-bold text-cyan-400 mb-2 flex items-center gap-2">
+                        🔊 Sound Effects
+                    </h2>
+                    <p class="text-xs text-slate-400 mb-4">ปุ่มสร้างบรรยากาศสำหรับกรรมการกดเล่นเสียงสด</p>
+                    
+                    <div class="space-y-2.5">
+                        <button onclick="playSynthSfx('drumroll')" class="w-full bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-between transition active:scale-95">
+                            <span>🥁 เสียงรัวกลองลุ้น</span>
+                            <span class="text-xs bg-amber-500/20 px-2 py-0.5 rounded">Drumroll</span>
+                        </button>
+                        <button onclick="playSynthSfx('tada')" class="w-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-between transition active:scale-95">
+                            <span>🎉 เสียงแตรฉลอง BINGO!</span>
+                            <span class="text-xs bg-emerald-500/20 px-2 py-0.5 rounded">Fanfare</span>
+                        </button>
+                        <button onclick="playSynthSfx('wrong')" class="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 font-bold py-3 px-4 rounded-xl text-sm flex items-center justify-between transition active:scale-95">
+                            <span>❌ เสียงแป๊ก / ผิดพลาด</span>
+                            <span class="text-xs bg-rose-500/20 px-2 py-0.5 rounded">Buzzer</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ตารางรายชื่อผู้ชนะ และ ที่อยู่จัดส่ง -->
+        <div class="bg-slate-900/80 p-6 rounded-3xl border border-emerald-500/30 shadow-xl space-y-4">
+            <h2 class="text-xl font-bold text-emerald-400 flex items-center gap-2">
+                🏆 ตารางสรุปรายชื่อผู้ชนะ & ที่อยู่จัดส่งของรางวัล
+            </h2>
+            <div class="overflow-x-auto rounded-2xl border border-slate-800">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-800 text-slate-200 text-xs font-bold uppercase">
+                        <tr>
+                            <th class="p-3.5">เวลาที่บิงโก</th>
+                            <th class="p-3.5">ชื่อ - นามสกุล</th>
+                            <th class="p-3.5">หน่วยงาน / สังกัด</th>
+                            <th class="p-3.5">การ์ด</th>
+                            <th class="p-3.5">เบอร์โทรศัพท์</th>
+                            <th class="p-3.5">ที่อยู่จัดส่งของรางวัล</th>
+                        </tr>
+                    </thead>
+                    <tbody id="winner-table-body" class="divide-y divide-slate-800 bg-slate-950/40">
+                        <tr><td colspan="6" class="p-6 text-center text-slate-500">ยังไม่มีผู้ชนะในขณะนี้</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- รายชื่อผู้เข้าร่วม -->
+        <div class="bg-slate-900/80 p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
+            <h2 class="text-xl font-bold text-cyan-400 flex items-center justify-between">
+                <span>👥 ผู้เข้าร่วมในระบบ</span>
+                <span class="text-sm bg-cyan-500/20 text-cyan-300 px-3 py-1 rounded-full border border-cyan-500/30 font-bold" id="player-count">0 คน</span>
+            </h2>
+            <div class="overflow-x-auto rounded-2xl border border-slate-800">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead class="bg-slate-800 text-slate-200 text-xs font-bold uppercase">
+                        <tr>
+                            <th class="p-3.5">Avatar</th>
+                            <th class="p-3.5">ชื่อ - นามสกุล</th>
+                            <th class="p-3.5">หน่วยงาน / สังกัด</th>
+                            <th class="p-3.5">การ์ดที่เลือก</th>
+                        </tr>
+                    </thead>
+                    <tbody id="player-table-body" class="divide-y divide-slate-800 bg-slate-950/40">
+                        <tr><td colspan="4" class="p-6 text-center text-slate-500">ยังไม่มีผู้เข้าร่วมในระบบ</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+    const socket = io();
+    let allWords = [];
+    let drawnWordsList = [];
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playSynthSfx(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        if (type === 'drumroll') {
+            for (let i = 0; i < 15; i++) {
+                setTimeout(() => {
+                    let osc = audioCtx.createOscillator();
+                    let gain = audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(100 + Math.random() * 30, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.08);
+                }, i * 60);
+            }
+        } else if (type === 'tada') {
+            const notes = [261.63, 329.63, 392.00, 523.25];
+            notes.forEach((freq, idx) => {
+                setTimeout(() => {
+                    let osc = audioCtx.createOscillator();
+                    let gain = audioCtx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.4);
+                }, idx * 100);
+            });
+        } else if (type === 'wrong') {
+            let osc = audioCtx.createOscillator();
+            let gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.3);
+        }
+
+        socket.emit('admin-play-sfx', type);
+    }
+
+    socket.on('init-data', (data) => {
+        allWords = data.wordList || [];
+        drawnWordsList = data.drawnWords || [];
+        
+        updateWordDropdown();
+        renderHistory(drawnWordsList);
+        renderWinners(data.winners || []);
+        renderPlayers(data.players || []);
+
+        if (data.isGameStarted) {
+            setGameStatusStarted();
+        }
+    });
+
+    function updateWordDropdown() {
+        const select = document.getElementById('select-word');
+        select.innerHTML = '<option value="">-- เลือกคำศัพท์จากรายการ --</option>';
+        allWords.forEach(w => {
+            if (!drawnWordsList.includes(w)) {
+                select.innerHTML += `<option value="${w}">${w}</option>`;
+            }
+        });
+    }
+
+    function setGameStatusStarted() {
+        const badge = document.getElementById('badge-status');
+        badge.innerText = '🟢 กำลังดำเนินเกมอยู่';
+        badge.className = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-4 py-1.5 rounded-full text-xs font-bold';
+    }
+
+    function startGame() {
+        socket.emit('admin-start-game');
+        setGameStatusStarted();
+        Swal.fire({ icon: 'success', title: 'เริ่มเกมเรียบร้อยแล้ว!', timer: 1200, showConfirmButton: false });
+    }
+
+    function drawSelectedWord() {
+        const select = document.getElementById('select-word');
+        const word = select.value;
+        const playSound = document.getElementById('chk-sound').checked;
+
+        if (!word) {
+            Swal.fire({ icon: 'warning', title: 'กรุณาเลือกคำศัพท์ก่อนครับ!', confirmButtonColor: '#f59e0b' });
+            return;
+        }
+
+        socket.emit('admin-draw-word', { word, playSound });
+    }
+
+    function drawRandomWord() {
+        const available = allWords.filter(w => !drawnWordsList.includes(w));
+        if (available.length === 0) {
+            Swal.fire({ icon: 'info', title: 'ประกาศคำศัพท์ครบหมดแล้วครับ!' });
+            return;
+        }
+        const randomWord = available[Math.floor(Math.random() * available.length)];
+        const playSound = document.getElementById('chk-sound').checked;
+        
+        socket.emit('admin-draw-word', { word: randomWord, playSound });
+    }
+
+    socket.on('word-drawn', (data) => {
+        drawnWordsList = data.history;
+        renderHistory(drawnWordsList);
+        updateWordDropdown();
+
+        if (data.playSound) {
+            speakThai(data.word);
+        }
+    });
+
+    function speakThai(text) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'th-TH';
+            utterance.rate = 0.9;
+            window.speechSynthesis.speak(utterance);
+        }
+    }
+
+    function renderHistory(history) {
+        document.getElementById('drawn-count').innerText = history.length;
+        const historyDiv = document.getElementById('admin-history');
+        if (history.length === 0) {
+            historyDiv.innerHTML = '<span class="text-xs text-slate-600 italic">ยังไม่มีการประกาศคำศัพท์</span>';
+            return;
+        }
+        historyDiv.innerHTML = history.map(w => 
+            `<span class="bg-cyan-500/20 border border-cyan-500/50 text-cyan-300 px-3 py-1 rounded-xl font-bold text-xs">${w}</span>`
+        ).join('');
+    }
+
+    socket.on('update-winners-list', (winners) => renderWinners(winners));
+
+    function renderWinners(winners) {
+        const tbody = document.getElementById('winner-table-body');
+        if (!winners || winners.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="6" class="p-6 text-center text-slate-500">ยังไม่มีผู้ชนะในขณะนี้</td></tr>';
+            return;
+        }
+        tbody.innerHTML = winners.map(w => `
+            <tr class="hover:bg-slate-800/50 transition">
+                <td class="p-3.5 text-xs text-slate-400">${w.time}</td>
+                <td class="p-3.5 font-bold text-emerald-400">${w.name}</td>
+                <td class="p-3.5">${w.org}</td>
+                <td class="p-3.5"><span class="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-xs font-bold text-amber-400">ใบที่ ${w.cardId}</span></td>
+                <td class="p-3.5 font-bold text-amber-300">${w.phone}</td>
+                <td class="p-3.5 text-xs text-slate-200">${w.address}</td>
+            </tr>
+        `).join('');
+    }
+
+    socket.on('player-list-updated', (players) => renderPlayers(players));
+
+    function renderPlayers(players) {
+        document.getElementById('player-count').innerText = `${players.length} คน`;
+        const tbody = document.getElementById('player-table-body');
+        if (!players || players.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-slate-500">ยังไม่มีผู้เข้าร่วมในระบบ</td></tr>';
+            return;
+        }
+        tbody.innerHTML = players.map(p => `
+            <tr class="hover:bg-slate-800/50 transition">
+                <td class="p-3.5 text-2xl">${p.avatar || '👤'}</td>
+                <td class="p-3.5 font-semibold text-white">${p.name} ${p.surname}</td>
+                <td class="p-3.5">${p.org}</td>
+                <td class="p-3.5"><span class="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-cyan-400 font-bold">ใบที่ ${p.cardId}</span></td>
+            </tr>
+        `).join('');
+    }
+
+    // รับการแจ้งเตือนเมื่อมีคน BINGO ทันที!
+    socket.on('bingo-alert-broadcast', (data) => {
+        playSynthSfx('tada');
+        Swal.fire({
+            icon: 'success',
+            title: '🎉 มีผู้บิงโกแล้ว!',
+            html: `<b style="font-size: 22px; color: #10b981;">${data.name}</b><br><span style="color: #cbd5e1;">หน่วยงาน: ${data.org} (การ์ดใบที่ ${data.cardId})</span>`,
+            confirmButtonColor: '#10b981',
+            confirmButtonText: 'รับทราบ 👍'
+        });
+    });
+
+    function resetGame() {
+        if (confirm('ยืนยันล้างข้อมูลและเริ่มเกมใหม่ทั้งหมด?')) {
+            socket.emit('admin-reset-game');
+            location.reload();
+        }
+    }
+</script>
+</body>
+</html>
