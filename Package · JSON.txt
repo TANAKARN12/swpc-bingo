@@ -1,0 +1,13 @@
+{
+  "name": "swpc-bingo-online",
+  "version": "2.0.0",
+  "description": "SWPC BINGO Online - ระบบบิงโกออนไลน์ สภาวิชาชีพสังคมสงเคราะห์ (รองรับ 3x3 / 5x5)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
