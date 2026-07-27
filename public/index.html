@@ -13,9 +13,32 @@
         body { font-family: 'Sarabun', sans-serif; background: #0f172a; }
         .cell-marked { background: #10b981 !important; color: white !important; font-weight: bold; border-color: #059669 !important; }
         .glow-text { text-shadow: 0 0 20px rgba(56, 189, 248, 0.6); }
+
+        /* Animation ป๊อปอัป BINGO แบบ Auto-Dismiss สำหรับ Display Mode */
+        @keyframes popFade {
+            0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; }
+            15% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            85% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+        }
+        .auto-dismiss-banner {
+            animation: popFade 5s forwards;
+        }
     </style>
 </head>
-<body class="text-white min-h-screen flex flex-col items-center justify-center p-3">
+<body class="text-white min-h-screen flex flex-col items-center justify-center p-3 relative">
+
+    <!-- [ส่วนเพิ่ม] ปุ่ม Floating กรอกที่อยู่รับรางวัลสำหรับผู้ชนะ (รูปแบบ B) -->
+    <button id="btn-floating-reward" onclick="openRewardModal()" class="hidden fixed top-4 right-4 z-50 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-900 font-extrabold px-4 py-2.5 rounded-full shadow-2xl border-2 border-amber-200 flex items-center gap-2 animate-bounce">
+        🎁 กรอกที่อยู่รับรางวัล
+    </button>
+
+    <!-- [ส่วนเพิ่ม] Auto-Dismiss Banner หน้าจอกลางเมื่อมีคน BINGO (ไม่ต้องกดรับทราบ) -->
+    <div id="display-bingo-banner" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 p-8 md:p-12 rounded-3xl shadow-[0_0_80px_rgba(245,158,11,0.8)] border-4 border-white text-center w-11/12 max-w-2xl pointer-events-none">
+        <h1 class="text-4xl md:text-6xl font-black mb-2 animate-pulse">🎉 BINGO! 🎉</h1>
+        <div id="display-winner-name" class="text-2xl md:text-4xl font-extrabold text-slate-900 mt-2"></div>
+        <div id="display-winner-sub" class="text-base md:text-xl text-slate-800 mt-1"></div>
+    </div>
 
     <div id="app" class="w-full max-w-md bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl p-5 border border-cyan-500/30 transition-all duration-300">
         
@@ -49,13 +72,24 @@
             </div>
         </div>
 
-        <!-- STEP 2: เลือกการ์ด -->
-        <div id="step-select-card" class="hidden">
-            <h2 class="text-base font-bold text-center text-cyan-400 mb-3">เลือกการ์ดบิงโกของคุณ</h2>
-            <div id="card-grid" class="grid grid-cols-4 gap-2 max-h-80 overflow-y-auto p-1"></div>
+        <!-- STEP 1.5: หน้ารอรอบถัดไป (เมื่อกรอกฟอร์มเข้ามาระหว่างรอบกำลังเล่นอยู่) -->
+        <div id="step-waiting-round" class="hidden text-center py-8 space-y-4">
+            <div class="inline-block bg-amber-500/10 border border-amber-500/30 rounded-2xl p-6">
+                <div class="text-4xl mb-2 animate-pulse">⏳</div>
+                <p class="text-amber-400 font-bold text-lg">รอบนี้กำลังเล่นอยู่</p>
+                <p class="text-slate-300 text-sm mt-1">กรุณารอสักครู่ ระบบจะพาไปเลือกการ์ดให้อัตโนมัติเมื่อรอบถัดไปเริ่ม</p>
+            </div>
+            <p class="text-xs text-slate-400">ผู้รอคิวขณะนี้: <span id="waiting-count" class="text-cyan-400 font-bold">0</span> คน</p>
         </div>
 
-        <!-- STEP 3: หน้ากระดานเล่น 3x3 -->
+        <!-- STEP 2: เลือกการ์ด (อวตารการ์ตูน 30 แบบ) -->
+        <div id="step-select-card" class="hidden">
+            <h2 class="text-base font-bold text-center text-cyan-400 mb-1">เลือกการ์ดอวตารนำโชคของคุณ</h2>
+            <p class="text-center text-[11px] text-slate-400 mb-3">โหมดกระดาน: <span id="board-size-label" class="text-amber-400 font-bold">3 x 3</span></p>
+            <div id="card-grid" class="grid grid-cols-4 gap-2.5 max-h-80 overflow-y-auto p-1"></div>
+        </div>
+
+        <!-- STEP 3: หน้ากระดานเล่น -->
         <div id="step-game" class="hidden">
             <div id="waiting-screen" class="text-center py-6">
                 <div class="inline-block bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4 mb-4">
@@ -81,13 +115,20 @@
 
         <!-- STEP 4: หน้าจอกลางสำหรับขึ้นจอใหญ่ / โปรเจกเตอร์ (DISPLAY MODE) -->
         <div id="step-viewer" class="hidden text-center py-2 space-y-4">
-            <div class="flex justify-between items-center bg-slate-900 p-3 rounded-2xl border border-slate-700">
+            <div class="flex flex-wrap justify-between items-center gap-2 bg-slate-900 p-3 rounded-2xl border border-slate-700">
                 <span class="text-amber-400 text-sm font-bold flex items-center gap-2">📺 หน้าจอแสดงผลกลาง SWPC</span>
                 <div class="flex items-center space-x-3">
                     <label class="flex items-center text-xs text-slate-300 cursor-pointer">
                         <input type="checkbox" id="viewer-sound-toggle" checked class="mr-1 accent-cyan-500"> 🔊 อ่านเสียง
                     </label>
                 </div>
+            </div>
+
+            <!-- สถานะรอบเกมแบบเรียลไทม์ -->
+            <div id="viewer-round-status" class="text-xs md:text-sm font-bold bg-slate-900/70 border border-slate-700 rounded-2xl px-4 py-2.5 flex flex-wrap justify-center gap-x-4 gap-y-1">
+                <span id="viewer-round-label" class="text-cyan-300">รอบที่ 1</span>
+                <span id="viewer-phase-label" class="text-amber-400">⏳ ยังไม่เริ่มเกม</span>
+                <span id="viewer-waiting-label" class="hidden text-slate-400">รอคิวรอบถัดไป: 0 คน</span>
             </div>
             
             <div class="bg-gradient-to-b from-slate-900 to-slate-950 p-6 md:p-10 rounded-3xl border-2 border-cyan-500/40 shadow-2xl">
@@ -115,11 +156,156 @@
     let playerData = {};
     let myCard = null;
     let drawnHistory = [];
+    let isViewerMode = false;
+    let boardSize = 3; // ค่าเริ่มต้น จะถูกอัปเดตจากเซิร์ฟเวอร์เสมอ
+    let gameIsStarted = false;
+    let roundNumber = 1;
+    let waitingCount = 0;
+
+    // ===== ระบบจำตัวตนผู้เล่นด้วย token (บัตรประจำตัว) =====
+    // เก็บ token ไว้ใน localStorage ของเบราว์เซอร์ผู้เล่น ใช้กู้คืนสถานะเดิมได้แม้ปิดแอพ/หลุดเน็ต/รีเฟรชหน้า
+    const TOKEN_KEY = 'swpcBingoToken';
+    let myToken = localStorage.getItem(TOKEN_KEY);
+    let hasPendingReward = false; // true = เป็นผู้ชนะที่ยังกรอกที่อยู่ไม่เสร็จ (ต้องคงปุ่มลอยไว้เสมอ ห้ามรีโหลดหน้าทิ้ง)
+    let awaitingIdentify = !!myToken; // กำลังรอผลกู้คืน session จาก token เดิมอยู่หรือไม่
+
+    if (awaitingIdentify) {
+        // ซ่อนหน้าตาทั้งหมดไว้ก่อนชั่วคราว ระหว่างรอผลกู้คืน session เพื่อกันการกระพริบเห็นหน้าลงทะเบียนเปล่าๆ
+        document.getElementById('app').style.visibility = 'hidden';
+        socket.emit('identify-player', myToken);
+    }
+
+    socket.on('identify-failed', () => {
+        // token เดิมใช้ไม่ได้แล้ว (ไม่เคยลงทะเบียน หรือระบบไม่มีข้อมูลใดๆ ผูกกับ token นี้เลย)
+        localStorage.removeItem(TOKEN_KEY);
+        myToken = null;
+        awaitingIdentify = false;
+        document.getElementById('app').style.visibility = 'visible';
+    });
+
+    socket.on('restore-session', (data) => {
+        awaitingIdentify = false;
+        document.getElementById('app').style.visibility = 'visible';
+
+        gameIsStarted = !!data.isGameStarted;
+        roundNumber = data.roundNumber || 1;
+        drawnHistory = data.drawnWords || [];
+
+        if (data.pendingWinner) {
+            hasPendingReward = true;
+            document.getElementById('btn-floating-reward').classList.remove('hidden');
+        }
+
+        if (data.player && data.needsCardSelection) {
+            // roster ยังอยู่ แต่การ์ดถูกล้าง (เช่นแอดมินเปลี่ยนขนาดกระดานระหว่างที่หลุดการเชื่อมต่ออยู่)
+            // -> พาไปเลือกการ์ดใหม่โดยตรง ไม่ต้องกรอกชื่อซ้ำ
+            playerData = { name: data.player.name, surname: data.player.surname, org: data.player.org, avatar: data.player.avatar };
+            document.getElementById('step-register').classList.add('hidden');
+            document.getElementById('step-waiting-round').classList.add('hidden');
+            document.getElementById('step-game').classList.add('hidden');
+            document.getElementById('step-select-card').classList.remove('hidden');
+
+            if (data.pendingWinner) openRewardModal();
+        } else if (data.player && data.card) {
+            // roster ยังอยู่ -> พาเข้าเกม/ห้องรอเดิมทันที ไม่ต้องกรอกชื่อซ้ำ
+            playerData = { name: data.player.name, surname: data.player.surname, org: data.player.org, avatar: data.player.avatar };
+            myCard = data.card;
+            document.getElementById('step-register').classList.add('hidden');
+            document.getElementById('step-select-card').classList.add('hidden');
+            document.getElementById('step-game').classList.remove('hidden');
+
+            if (gameIsStarted) {
+                document.getElementById('waiting-screen').classList.add('hidden');
+                document.getElementById('game-board-area').classList.remove('hidden');
+                renderBingoBoard();
+                const pWord = document.getElementById('current-drawn-word');
+                if (pWord && drawnHistory.length) pWord.innerText = drawnHistory[drawnHistory.length - 1];
+            }
+
+            if (data.pendingWinner) {
+                // ชนะไปแล้วในรอบก่อนแต่ยังกรอกที่อยู่ไม่เสร็จ เปิด modal ให้กรอกต่อได้เลย
+                openRewardModal();
+            }
+        } else if (data.pendingWinner) {
+            // roster ถูกล้างไปแล้ว (แอดมินกด "รีเซ็ตทั้งหมด") แต่ยังมีของรางวัลค้างกรอกที่อยู่อยู่
+            // ให้ผู้เล่นกรอกที่อยู่ได้อย่างเดียว ไม่บังคับให้ลงทะเบียนใหม่
+            document.getElementById('step-register').classList.add('hidden');
+            openRewardModal();
+        }
+        // กรณีไม่มีทั้ง player และ pendingWinner จะไม่เกิดขึ้น เพราะ server เช็คแล้วก่อนส่ง event นี้มา
+    });
+
+    // อวตารนำโชค 30 แบบ
+    const avatarList = ['🐱','🐶','🦊','🐰','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆','🦅','🦉','🦄','🐝','🐛','🦋','🐢','🐙','🦑','🦞','🦀','🐡','🐬'];
 
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
+    // เบราว์เซอร์จะล็อกเสียงไว้จนกว่าจะมี user gesture (คลิก/แตะ) เกิดขึ้นบนหน้านี้ก่อน
+    // ต้อง unlock ตรงจุดที่ผู้เล่น/ผู้ชมกดจริงๆ ไม่งั้นเสียงที่สั่งเล่นผ่าน socket event จะเงียบ
+    function unlockAudio() {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+    document.addEventListener('click', function onceUnlock() {
+        unlockAudio();
+        document.removeEventListener('click', onceUnlock);
+    }, { once: true });
+
+    // ===== ชุดสร้างเสียงปรบมือ/เสียงเชียร์แบบสังเคราะห์ (ใช้ noise burst ผ่าน bandpass filter จำลองเสียงตบมือ) =====
+    function createClapNoiseBuffer(ctx, duration) {
+        const bufferSize = Math.max(1, Math.floor(ctx.sampleRate * duration));
+        const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+        return buffer;
+    }
+    function playSingleClap(ctx, time, opts) {
+        opts = opts || {};
+        const volume = opts.volume ?? 0.5, freq = opts.freq ?? 1500, duration = opts.duration ?? 0.08;
+        const noise = ctx.createBufferSource();
+        noise.buffer = createClapNoiseBuffer(ctx, duration);
+        const bandpass = ctx.createBiquadFilter();
+        bandpass.type = 'bandpass';
+        bandpass.frequency.value = freq;
+        bandpass.Q.value = 0.7;
+        const gain = ctx.createGain();
+        gain.gain.setValueAtTime(volume, time);
+        gain.gain.exponentialRampToValueAtTime(0.001, time + duration);
+        noise.connect(bandpass); bandpass.connect(gain); gain.connect(ctx.destination);
+        noise.start(time); noise.stop(time + duration);
+    }
+    function playApplause(ctx, opts) {
+        opts = opts || {};
+        const clapCount = opts.clapCount ?? 24, spread = opts.spread ?? 1.2, buildUp = !!opts.buildUp, cheer = !!opts.cheer;
+        const now = ctx.currentTime;
+        for (let i = 0; i < clapCount; i++) {
+            const t = now + (buildUp ? Math.pow(i / clapCount, 1.5) : Math.random()) * spread;
+            playSingleClap(ctx, t, { volume: 0.25 + Math.random() * 0.25, freq: 1000 + Math.random() * 2000, duration: 0.05 + Math.random() * 0.05 });
+        }
+        if (cheer) {
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(300, now);
+            osc.frequency.exponentialRampToValueAtTime(700, now + spread * 0.8);
+            g.gain.setValueAtTime(0.0001, now);
+            g.gain.exponentialRampToValueAtTime(0.15, now + spread * 0.4);
+            g.gain.exponentialRampToValueAtTime(0.0001, now + spread * 0.9);
+            osc.connect(g); g.connect(ctx.destination);
+            osc.start(now); osc.stop(now + spread);
+        }
+    }
+
     function playSynthSfx(type) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
+
+        // เสียงปรบมือ/เชียร์ 6 แบบ แยกออกไปก่อน เพื่อไม่ปนกับ SFX แบบ oscillator เดี่ยวด้านล่าง
+        if (type === 'clap-single') { playSingleClap(audioCtx, audioCtx.currentTime, { volume: 0.6, freq: 1400, duration: 0.09 }); return; }
+        if (type === 'clap-short') { playApplause(audioCtx, { clapCount: 10, spread: 0.6 }); return; }
+        if (type === 'clap-long') { playApplause(audioCtx, { clapCount: 30, spread: 2.2 }); return; }
+        if (type === 'clap-buildup') { playApplause(audioCtx, { clapCount: 24, spread: 1.6, buildUp: true }); return; }
+        if (type === 'clap-cheer') { playApplause(audioCtx, { clapCount: 26, spread: 1.8, cheer: true }); return; }
+        if (type === 'clap-thunder') { playApplause(audioCtx, { clapCount: 45, spread: 2.5, cheer: true }); return; }
+
         let osc = audioCtx.createOscillator();
         let gain = audioCtx.createGain();
 
@@ -130,6 +316,33 @@
             gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
             osc.connect(gain); gain.connect(audioCtx.destination);
             osc.start(); osc.stop(audioCtx.currentTime + 0.05);
+        } else if (type === 'drumroll') {
+            for (let i = 0; i < 15; i++) {
+                setTimeout(() => {
+                    let o = audioCtx.createOscillator();
+                    let g = audioCtx.createGain();
+                    o.type = 'triangle';
+                    o.frequency.setValueAtTime(100 + Math.random() * 30, audioCtx.currentTime);
+                    g.gain.setValueAtTime(0.3, audioCtx.currentTime);
+                    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
+                    o.connect(g); g.connect(audioCtx.destination);
+                    o.start(); o.stop(audioCtx.currentTime + 0.08);
+                }, i * 60);
+            }
+        } else if (type === 'heartbeat') {
+            const beat = (time, freq) => {
+                let o = audioCtx.createOscillator();
+                let g = audioCtx.createGain();
+                o.type = 'sine';
+                o.frequency.setValueAtTime(freq, time);
+                o.frequency.exponentialRampToValueAtTime(30, time + 0.15);
+                g.gain.setValueAtTime(0.6, time);
+                g.gain.exponentialRampToValueAtTime(0.01, time + 0.15);
+                o.connect(g); g.connect(audioCtx.destination);
+                o.start(time); o.stop(time + 0.15);
+            };
+            beat(audioCtx.currentTime, 80);
+            beat(audioCtx.currentTime + 0.18, 65);
         } else if (type === 'tada') {
             const notes = [261.63, 329.63, 392.00, 523.25];
             notes.forEach((freq, idx) => {
@@ -144,6 +357,14 @@
                     o.start(); o.stop(audioCtx.currentTime + 0.4);
                 }, idx * 100);
             });
+        } else if (type === 'wrong') {
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(80, audioCtx.currentTime + 0.3);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+            osc.connect(gain); gain.connect(audioCtx.destination);
+            osc.start(); osc.stop(audioCtx.currentTime + 0.3);
         }
     }
 
@@ -151,14 +372,38 @@
 
     document.getElementById('form-register').addEventListener('submit', (e) => {
         e.preventDefault();
+        unlockAudio(); // user gesture จริง -> ปลดล็อกเสียงตรงนี้เลย
         playerData.name = document.getElementById('input-name').value;
         playerData.surname = document.getElementById('input-surname').value;
         playerData.org = document.getElementById('input-org').value;
         document.getElementById('step-register').classList.add('hidden');
-        document.getElementById('step-select-card').classList.remove('hidden');
+
+        if (gameIsStarted) {
+            // รอบกำลังเล่นอยู่ -> เข้าคิวรอรอบถัดไป ห้ามเลือกการ์ดในรอบนี้
+            document.getElementById('step-waiting-round').classList.remove('hidden');
+            socket.emit('join-waiting-room', playerData);
+        } else {
+            document.getElementById('step-select-card').classList.remove('hidden');
+        }
+    });
+
+    socket.on('waiting-count-updated', (data) => {
+        waitingCount = data.count || 0;
+        const el = document.getElementById('waiting-count');
+        if (el) el.innerText = waitingCount;
+        updateViewerStatus();
+    });
+
+    // เผื่อกรณี race condition: กดเลือกการ์ดพอดีตอนแอดมินกด Start Game
+    socket.on('registration-blocked', (data) => {
+        document.getElementById('step-select-card').classList.add('hidden');
+        document.getElementById('step-waiting-round').classList.remove('hidden');
+        Swal.fire({ icon: 'info', title: 'รอบเริ่มไปแล้วครับ', text: data.message, timer: 2000, showConfirmButton: false });
     });
 
     function switchToViewerMode() {
+        isViewerMode = true;
+        unlockAudio(); // user gesture จริง -> ปลดล็อกเสียงฝั่งจอกลางตรงนี้
         document.getElementById('step-register').classList.add('hidden');
         document.getElementById('header-brand').classList.add('hidden');
         
@@ -167,26 +412,92 @@
         app.classList.add('max-w-4xl');
         
         document.getElementById('step-viewer').classList.remove('hidden');
+        updateViewerStatus();
+    }
+
+    // อัปเดตแถบสถานะรอบเกมแบบเรียลไทม์บนจอกลาง (โหมด Display)
+    function updateViewerStatus() {
+        const roundLabel = document.getElementById('viewer-round-label');
+        const phaseLabel = document.getElementById('viewer-phase-label');
+        const waitLabel = document.getElementById('viewer-waiting-label');
+        if (!roundLabel) return;
+
+        roundLabel.innerText = `รอบที่ ${roundNumber}`;
+        if (gameIsStarted) {
+            phaseLabel.innerText = '🟢 กำลังเล่นอยู่';
+            phaseLabel.className = 'text-emerald-400';
+        } else {
+            phaseLabel.innerText = '⏳ ยังไม่เริ่มเกม (เปิดให้เลือกการ์ดได้)';
+            phaseLabel.className = 'text-amber-400';
+        }
+
+        if (waitingCount > 0) {
+            waitLabel.classList.remove('hidden');
+            waitLabel.innerText = `รอคิวรอบถัดไป: ${waitingCount} คน`;
+        } else {
+            waitLabel.classList.add('hidden');
+        }
+    }
+
+    function applyBoardSize(size) {
+        boardSize = size === 5 ? 5 : 3;
+        const label = document.getElementById('board-size-label');
+        if (label) label.innerText = `${boardSize} x ${boardSize}`;
     }
 
     socket.on('init-data', (data) => {
         drawnHistory = data.drawnWords || [];
+        gameIsStarted = !!data.isGameStarted;
+        roundNumber = data.roundNumber || 1;
+        waitingCount = data.waitingCount || 0;
+        applyBoardSize(data.boardSize);
         renderCardSelection(data.cards);
+        updateViewerStatus();
     });
 
     socket.on('cards-updated', (cards) => renderCardSelection(cards));
 
+    // เมื่อแอดมินเปลี่ยนขนาดกระดานระหว่างที่ผู้เล่นอยู่ในระบบ -> พาไปเลือกการ์ดใหม่ให้ตรงกับขนาดกระดานปัจจุบัน
+    // สำคัญ: ไม่รีโหลดหน้า/ไม่ล้าง token อีกต่อไป เพราะ "ตัวตน" (ชื่อ/องค์กร) ของผู้เล่นยังคงถูกเก็บไว้ที่เซิร์ฟเวอร์เสมอ
+    // ผู้เล่นแค่ต้องเลือกการ์ดใบใหม่เท่านั้น ไม่ต้องกรอกฟอร์มซ้ำ
+    socket.on('board-size-updated', (data) => {
+        applyBoardSize(data.boardSize);
+        gameIsStarted = !!data.isGameStarted;
+        renderCardSelection(data.cards);
+        updateViewerStatus();
+
+        if (isViewerMode) return;
+
+        if (playerData.name && !hasPendingReward) {
+            myCard = null;
+            document.getElementById('step-register').classList.add('hidden');
+            document.getElementById('step-waiting-round').classList.add('hidden');
+            document.getElementById('step-game').classList.add('hidden');
+            document.getElementById('step-select-card').classList.remove('hidden');
+            Swal.fire({ icon: 'info', title: 'ผู้ดูแลระบบเปลี่ยนขนาดกระดาน', text: 'กรุณาเลือกการ์ดใบใหม่ให้ตรงกับขนาดกระดานปัจจุบันครับ (ไม่ต้องกรอกชื่อซ้ำ)', timer: 2500, showConfirmButton: false });
+        }
+    });
+
+    // [ส่วนปรับแก้] แสดงผลการ์ดเป็น อวตารการ์ตูนน่ารัก 30 ตัว
     function renderCardSelection(cards) {
         const grid = document.getElementById('card-grid');
         if (!grid) return;
         grid.innerHTML = '';
-        cards.forEach(c => {
+        cards.forEach((c, idx) => {
             const btn = document.createElement('button');
             const isTaken = c.selectedBy !== null;
-            btn.className = `p-3 text-sm rounded-xl font-bold border transition ${isTaken ? 'bg-slate-700 border-slate-600 text-slate-500 cursor-not-allowed' : 'bg-slate-700 border-cyan-500 text-cyan-400 hover:bg-cyan-500 hover:text-slate-900'}`;
-            btn.innerText = `ใบที่ ${c.id}`;
+            const emoji = avatarList[idx % avatarList.length];
+            
+            btn.className = `p-2.5 rounded-2xl flex flex-col items-center justify-center border-2 transition relative ${isTaken ? 'bg-slate-800 border-slate-700 text-slate-600 cursor-not-allowed opacity-40' : 'bg-slate-700 border-cyan-500/50 text-white hover:bg-cyan-500 hover:text-slate-900 hover:scale-105 shadow-md'}`;
+            btn.innerHTML = `
+                <span class="text-2xl mb-1">${emoji}</span>
+                <span class="text-[10px] font-bold opacity-80">ใบที่ ${c.id}</span>
+            `;
             btn.disabled = isTaken;
-            btn.onclick = () => socket.emit('register-player', { ...playerData, cardId: c.id });
+            btn.onclick = () => {
+                playerData.avatar = emoji;
+                socket.emit('register-player', { ...playerData, cardId: c.id, avatar: emoji });
+            };
             grid.appendChild(btn);
         });
     }
@@ -204,11 +515,37 @@
 
     socket.on('register-success', (data) => {
         myCard = data.card;
+        if (data.token) {
+            myToken = data.token;
+            localStorage.setItem(TOKEN_KEY, myToken); // เก็บ "บัตรประจำตัว" ไว้กู้คืนสถานะภายหลัง
+        }
         document.getElementById('step-select-card').classList.add('hidden');
         document.getElementById('step-game').classList.remove('hidden');
     });
 
+    // แอดมินเปิด "รอบใหม่ (คงผู้เล่นเดิม)" -> ได้การ์ดใบใหม่อัตโนมัติ กระโดดเข้าเกมได้เลยไม่ต้องกรอกอะไรซ้ำ
+    socket.on('your-new-card', (data) => {
+        myCard = data.card;
+        roundNumber = data.roundNumber || roundNumber;
+        gameIsStarted = true;
+        drawnHistory = [];
+
+        document.getElementById('step-register').classList.add('hidden');
+        document.getElementById('step-waiting-round').classList.add('hidden');
+        document.getElementById('step-select-card').classList.add('hidden');
+        document.getElementById('step-game').classList.remove('hidden');
+        document.getElementById('waiting-screen').classList.add('hidden');
+        document.getElementById('game-board-area').classList.remove('hidden');
+        document.getElementById('current-drawn-word').innerText = '-';
+        renderBingoBoard();
+        updateViewerStatus();
+
+        Swal.fire({ icon: 'success', title: `เริ่มรอบที่ ${roundNumber} แล้ว!`, text: 'คุณได้รับการ์ดใบใหม่อัตโนมัติ', timer: 1800, showConfirmButton: false });
+    });
+
     socket.on('game-started', () => {
+        gameIsStarted = true;
+        updateViewerStatus();
         document.getElementById('waiting-screen').classList.add('hidden');
         document.getElementById('game-board-area').classList.remove('hidden');
         renderBingoBoard();
@@ -216,12 +553,18 @@
 
     function renderBingoBoard() {
         const board = document.getElementById('bingo-board');
+        // ปรับจำนวนคอลัมน์ของกระดานให้ตรงกับขนาดที่แอดมินตั้งไว้ (3x3 หรือ 5x5)
+        board.className = `grid grid-cols-${boardSize} gap-2 mb-4 w-full aspect-square`;
         board.innerHTML = '';
+
+        const isBigBoard = boardSize === 5;
+        const textSizeClass = isBigBoard ? 'text-[9px] sm:text-[11px] md:text-xs' : 'text-xs sm:text-sm md:text-base';
+
         myCard.forEach((row) => {
             row.forEach((val) => {
                 const cell = document.createElement('button');
                 const isFree = val === "FREE";
-                cell.className = `w-full h-full text-xs sm:text-sm md:text-base font-extrabold p-1.5 flex items-center justify-center text-center rounded-2xl border-2 border-slate-600 bg-slate-700 text-slate-100 shadow transition ${isFree ? 'cell-marked' : ''}`;
+                cell.className = `w-full h-full ${textSizeClass} font-extrabold p-1 flex items-center justify-center text-center rounded-2xl border-2 border-slate-600 bg-slate-700 text-slate-100 shadow transition leading-tight ${isFree ? 'cell-marked' : ''}`;
                 cell.innerText = val;
 
                 cell.onclick = () => {
@@ -239,12 +582,15 @@
 
     socket.on('word-drawn', (data) => {
         drawnHistory = data.history;
-        
-        const pWord = document.getElementById('current-drawn-word');
-        if (pWord) pWord.innerText = data.word;
 
-        const vWord = document.getElementById('viewer-word');
-        if (vWord) vWord.innerText = data.word;
+        // data.word เป็น null ได้เมื่อแอดมินลบคำศัพท์ออกจากระบบ (ไม่ใช่การประกาศจริง)
+        if (data.word) {
+            const pWord = document.getElementById('current-drawn-word');
+            if (pWord) pWord.innerText = data.word;
+
+            const vWord = document.getElementById('viewer-word');
+            if (vWord) vWord.innerText = data.word;
+        }
 
         const vCount = document.getElementById('viewer-count');
         if (vCount) vCount.innerText = `${data.history.length} คำ`;
@@ -255,7 +601,7 @@
         }
 
         const soundEnabled = document.getElementById('viewer-sound-toggle')?.checked;
-        if (data.playSound && soundEnabled) {
+        if (data.word && data.playSound && soundEnabled) {
             speakThai(data.word);
         }
     });
@@ -274,10 +620,16 @@
         socket.emit('claim-bingo');
     }
 
-    // หน้าจอของผู้บิงโกเอง ให้ขึ้นจุดพลุ + ฟอร์มกรอกที่อยู่
+    // [ส่วนปรับแก้] เมื่อ BINGO สำเร็จ ให้เปิดปุ่ม Floating รับของรางวัล (รูปแบบ B)
     socket.on('bingo-verified-winner', (data) => {
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+        hasPendingReward = true; // ห้ามให้ game-reset รีโหลดหน้าทิ้งจนกว่าจะกรอกที่อยู่เสร็จ
+        document.getElementById('btn-floating-reward').classList.remove('hidden');
+        openRewardModal();
+    });
 
+    // ฟังก์ชันเปิด Modal กรอกที่อยู่รับของรางวัล (แบบ B)
+    function openRewardModal() {
         Swal.fire({
             title: '🎉 ยินดีด้วย คุณ BINGO สำเร็จ!',
             text: 'กรุณากรอกข้อมูลที่อยู่สำหรับจัดส่งของรางวัล:',
@@ -285,9 +637,11 @@
                 '<input id="swal-phone" class="swal2-input" placeholder="เบอร์โทรศัพท์ติดต่อ">' +
                 '<textarea id="swal-address" class="swal2-textarea" placeholder="ที่อยู่จัดส่งของรางวัลอย่างละเอียด"></textarea>',
             focusConfirm: false,
-            confirmButtonText: 'ส่งข้อมูลรับของรางวัล 📦',
+            confirmButtonText: 'บันทึกข้อมูล 📦',
             confirmButtonColor: '#10b981',
-            allowOutsideClick: false,
+            showCancelButton: true,
+            cancelButtonText: 'ไว้กรอกทีหลัง',
+            cancelButtonColor: '#64748b',
             preConfirm: () => {
                 const phone = document.getElementById('swal-phone').value;
                 const address = document.getElementById('swal-address').value;
@@ -299,30 +653,75 @@
         }).then((result) => {
             if (result.isConfirmed) {
                 socket.emit('submit-winner-info', result.value);
-                Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลเรียบร้อย!', text: 'ทางสภาวิชาชีพฯ จะทำการจัดส่งของรางวัลให้ท่านครับ' });
             }
         });
+    }
+
+    // เซิร์ฟเวอร์ยืนยันว่าบันทึกที่อยู่สำเร็จแล้ว -> ปิดปุ่มลอย และปลดล็อกให้ game-reset รีโหลดหน้าได้ตามปกติ
+    socket.on('winner-info-saved', () => {
+        hasPendingReward = false;
+        document.getElementById('btn-floating-reward').classList.add('hidden');
+        Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลเรียบร้อย!', text: 'ทางสภาวิชาชีพฯ จะทำการจัดส่งของรางวัลให้ท่านครับ' });
     });
 
-    // หน้าผู้รับชม (Display) และ ผู้เล่นคนอื่น จะเห็นป๊อบอัพประกาศทันทีเมื่อมีคนบิงโก
+    // [ส่วนปรับแก้] หน้าจอกลางเมื่อมีคน BINGO ให้ขึ้น Banner ลอยแล้วหายไปเอง 5 วินาที
     socket.on('bingo-alert-broadcast', (data) => {
         confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
         playSynthSfx('tada');
         
-        Swal.fire({
-            icon: 'success',
-            title: '🎉 มีผู้ BINGO แล้ว!',
-            html: `<b style="font-size: 24px; color: #10b981;">${data.name}</b><br><span style="color: #cbd5e1;">หน่วยงาน: ${data.org} (การ์ดใบที่ ${data.cardId})</span>`,
-            confirmButtonColor: '#10b981',
-            confirmButtonText: 'ยินดีด้วย! 👏'
-        });
+        if (isViewerMode) {
+            const banner = document.getElementById('display-bingo-banner');
+            document.getElementById('display-winner-name').innerText = `${data.avatar || '👤'} ${data.name}`;
+            document.getElementById('display-winner-sub').innerText = `สังกัด: ${data.org} (การ์ดใบที่ ${data.cardId})`;
+            
+            banner.classList.remove('hidden', 'auto-dismiss-banner');
+            void banner.offsetWidth; // Trigger Reflow
+            banner.classList.add('auto-dismiss-banner');
+
+            setTimeout(() => {
+                banner.classList.add('hidden');
+            }, 5000);
+        } else {
+            Swal.fire({
+                icon: 'success',
+                title: '🎉 มีผู้ BINGO แล้ว!',
+                html: `<b style="font-size: 24px; color: #10b981;">${data.name}</b><br><span style="color: #cbd5e1;">หน่วยงาน: ${data.org} (การ์ดใบที่ ${data.cardId})</span>`,
+                confirmButtonColor: '#10b981',
+                confirmButtonText: 'ยินดีด้วย! 👏'
+            });
+        }
     });
 
     socket.on('bingo-rejected', (msg) => {
         Swal.fire({ icon: 'error', title: 'ยังไม่ บิงโก!', text: msg, confirmButtonColor: '#ef4444' });
     });
 
-    socket.on('game-reset', () => location.reload());
+    socket.on('game-reset', (data) => {
+        // จอกลาง (Display Mode): แค่รีเซ็ตสถานะรอบบนหน้าจอ ไม่ต้องรีโหลดทั้งหน้า
+        if (isViewerMode) {
+            gameIsStarted = false;
+            roundNumber = data?.roundNumber || roundNumber;
+            waitingCount = 0;
+            drawnHistory = [];
+            document.getElementById('viewer-word').innerText = 'รอเริ่มเกม...';
+            document.getElementById('viewer-history').innerHTML = '';
+            document.getElementById('viewer-count').innerText = '0 คำ';
+            updateViewerStatus();
+            return;
+        }
+
+        // สำคัญที่สุด: ถ้ายังกรอกที่อยู่รับรางวัลไม่เสร็จ ห้ามรีโหลดหน้าทิ้งเด็ดขาด ต้องกรอกต่อได้เสมอ
+        if (hasPendingReward) {
+            gameIsStarted = false;
+            roundNumber = data?.roundNumber || roundNumber;
+            Swal.fire({ icon: 'info', title: 'แอดมินเปิดรอบใหม่แล้ว', text: 'ท่านยังกรอกที่อยู่รับรางวัลของท่านได้ตามปกติครับ (กดปุ่ม 🎁 มุมขวาบน)', timer: 2500, showConfirmButton: false });
+            return;
+        }
+
+        // ผู้เล่นทั่วไปที่ไม่มีของรางวัลค้างอยู่ -> เคลียร์ token เดิมแล้วกลับไปหน้าลงทะเบียนใหม่ทั้งหมด
+        localStorage.removeItem(TOKEN_KEY);
+        location.reload();
+    });
 </script>
 </body>
 </html>
