@@ -71,6 +71,48 @@
         .auto-dismiss-banner {
             animation: popFade 5s forwards;
         }
+
+        /* [ส่วนเพิ่ม] อนิเมชัน "ปั๊มตราประทับ" สีทอง เวลาผู้เล่นแตะทำเครื่องหมายในช่อง ให้ความรู้สึกน่าเล่น/สนุกกว่าการสลับสีเฉยๆ */
+        @keyframes stampPop {
+            0%   { transform: scale(1.7) rotate(-14deg); opacity: 0; }
+            55%  { transform: scale(0.92) rotate(4deg); opacity: 1; }
+            75%  { transform: scale(1.08) rotate(-2deg); }
+            100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        .cell-stamp-fx { animation: stampPop 0.35s cubic-bezier(.2,.9,.3,1.3); }
+        .cell-marked {
+            animation: glowPulseOnce 0.5s ease-out;
+        }
+        @keyframes glowPulseOnce {
+            0% { box-shadow: 0 0 0px rgba(16,185,129,0); }
+            40% { box-shadow: 0 0 22px rgba(16,185,129,0.95); }
+            100% { box-shadow: 0 0 8px rgba(16,185,129,0.45); }
+        }
+
+        /* [ส่วนเพิ่ม] กรอบกระดานกะพริบเรืองแสง เมื่อผู้เล่นเหลืออีกแค่ 1 ช่องจะ BINGO เพิ่มความลุ้นระทึก */
+        @keyframes edgeGlowPulse {
+            0%, 100% { box-shadow: 0 0 12px 2px rgba(245,158,11,0.35), inset 0 0 20px rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.4); }
+            50% { box-shadow: 0 0 34px 8px rgba(245,158,11,0.9), inset 0 0 30px rgba(245,158,11,0.25); border-color: rgba(245,158,11,0.95); }
+        }
+        .board-near-bingo { animation: edgeGlowPulse 1.1s ease-in-out infinite; }
+
+        /* [ส่วนเพิ่ม] แถบข่าววิ่ง (Live Feed) แสดงคำศัพท์ล่าสุดที่เพิ่งออก บนจอผู้เล่น */
+        .ticker-track { display: flex; gap: 0.5rem; white-space: nowrap; }
+
+        /* [ส่วนเพิ่ม] ปุ่ม BINGO ตอนกดไปแล้วและยืนยันว่าชนะ ให้เป็นสีเทาปิดการใช้งาน กันสับสน/กดซ้ำ */
+        #btn-bingo:disabled {
+            background: #475569 !important;
+            color: #94a3b8 !important;
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.75;
+        }
+
+        /* [ส่วนเพิ่ม] ปรับกระดานให้ดูใหญ่ใช้พื้นที่ชัดเจนขึ้น + ตัวหนังสือคมชัดอ่านง่ายขึ้น */
+        #bingo-board button { line-height: 1.12; letter-spacing: -0.01em; }
+        @media (min-width: 420px) {
+            #app.app-wide { max-width: 34rem; }
+        }
     </style>
 </head>
 <body class="text-white min-h-screen flex flex-col items-center justify-center p-3 relative">
@@ -83,6 +125,11 @@
     <!-- [ส่วนเพิ่ม] ปุ่มไอคอน "i" เปิดดูเงื่อนไข/กติกาการเล่น (เนื้อหาแก้ไขได้จากหลังบ้าน ไม่ต้องแตะโค้ด) -->
     <button id="btn-info-rules" onclick="openRulesModal()" title="เงื่อนไข/กติกาการเล่น" class="fixed top-4 left-4 z-50 w-11 h-11 flex items-center justify-center bg-slate-800/90 hover:bg-slate-700 text-cyan-300 border-2 border-cyan-500/40 rounded-full shadow-xl text-lg font-black transition active:scale-95">
         ℹ️
+    </button>
+
+    <!-- [ส่วนเพิ่ม] ปุ่มไอคอน "🏆" เปิดดูตัวอย่างรูปแบบการชนะ (Mini-Grid) แยกจากกติกาข้อความล้วน ให้กดดูเข้าใจง่ายเป็นภาพ -->
+    <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="fixed top-[4.25rem] left-4 z-50 w-11 h-11 flex items-center justify-center bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-2 border-amber-500/40 rounded-full shadow-xl text-lg font-black transition active:scale-95">
+        🏆
     </button>
 
 
@@ -104,7 +151,7 @@
         <div id="display-winner-sub" class="text-base md:text-xl text-slate-800 mt-1"></div>
     </div>
 
-    <div id="app" class="w-full max-w-md bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl p-5 border border-cyan-500/30 transition-all duration-300">
+    <div id="app" class="w-full max-w-md bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl p-3 sm:p-5 border border-cyan-500/30 transition-all duration-300">
         
         <div id="header-brand" class="text-center mb-4">
             <h1 class="text-2xl font-extrabold text-cyan-400">สภาวิชาชีพสังคมสงเคราะห์</h1>
@@ -167,15 +214,23 @@
                 <div id="avatar-lobby" class="flex flex-wrap justify-center gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-700/50 max-h-48 overflow-y-auto"></div>
             </div>
 
-            <div id="game-board-area" class="hidden space-bg p-3 md:p-4">
-                <div class="bg-slate-900/60 backdrop-blur-sm p-3 rounded-2xl text-center mb-3 border border-cyan-500/30">
+            <div id="game-board-area" class="hidden space-bg p-2.5 md:p-4">
+                <div class="bg-slate-900/60 backdrop-blur-sm p-3 rounded-2xl text-center mb-2 border border-cyan-500/30">
                     <div class="text-xs text-slate-400">คำศัพท์ล่าสุดที่ออก</div>
                     <div id="current-drawn-word" class="text-2xl md:text-3xl font-black text-amber-400 my-1">-</div>
                 </div>
 
+                <!-- [ส่วนเพิ่ม] แถบข่าววิ่ง Live Feed: คำศัพท์ 3 คำล่าสุด กันคนเผลอฟัง/อ่านไม่ทัน -->
+                <div id="live-feed-bar" class="hidden overflow-hidden bg-slate-900/50 border border-cyan-500/20 rounded-xl mb-2 py-1.5 px-2">
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-bold text-cyan-400 flex-shrink-0">📡 ล่าสุด</span>
+                        <div id="live-feed-track" class="ticker-track text-[11px] font-bold"></div>
+                    </div>
+                </div>
+
                 <div id="bingo-progress" class="text-center text-xs md:text-sm font-bold text-slate-400 mb-2"></div>
 
-                <div id="bingo-board" class="grid grid-cols-3 gap-2 mb-4 w-full aspect-square"></div>
+                <div id="bingo-board" class="grid grid-cols-3 gap-1.5 md:gap-2 mb-4 w-full aspect-square rounded-2xl border-2 border-transparent transition-all duration-300"></div>
 
                 <button id="btn-bingo" onclick="claimBingo()" class="w-full bg-gradient-to-r from-pink-500 to-rose-600 hover:from-pink-600 hover:to-rose-700 text-white font-black py-4 rounded-2xl text-xl shadow-xl active:scale-95 transition">
                     🎉 BINGO! 🎉
@@ -854,7 +909,7 @@
 
     // คำนวณขนาดตัวอักษรเริ่มต้นต่อช่อง (จุดเริ่มก่อนค่อยๆ ลดจริงด้วยการวัดขนาดจริงใน fitTextToCell)
     function getCellFontSizePx(word, size) {
-        const baseBySize = { 3: 18, 4: 14, 5: 12, 6: 10 };
+        const baseBySize = { 3: 22, 4: 17, 5: 15, 6: 12 };
         let px = baseBySize[size] || baseBySize[3];
         const len = (word || '').length;
         if (len > 12) px *= 0.5;
@@ -878,6 +933,13 @@
     }
 
     function renderBingoBoard() {
+        // [ส่วนเพิ่ม] ทุกครั้งที่กระดานถูก render ใหม่ (การ์ดใหม่/รอบใหม่) ให้ปุ่ม BINGO กลับมาใช้งานได้ตามปกติ
+        const bingoBtn = document.getElementById('btn-bingo');
+        if (bingoBtn) {
+            bingoBtn.disabled = false;
+            bingoBtn.innerText = '🎉 BINGO! 🎉';
+        }
+
         const board = document.getElementById('bingo-board');
         // ปรับจำนวนคอลัมน์ของกระดานให้ตรงกับขนาดที่แอดมินตั้งไว้ (3x3 / 4x4 / 5x5 / 6x6)
         board.className = `grid grid-cols-${boardSize} gap-2 mb-4 w-full aspect-square`;
@@ -895,6 +957,12 @@
                 cell.onclick = () => {
                     if (isFree || drawnHistory.includes(val)) {
                         cell.classList.toggle('cell-marked');
+                        if (cell.classList.contains('cell-marked')) {
+                            // อนิเมชันปั๊มตราประทับสีทองตอนติ๊กเลือก ให้ความรู้สึกเหมือนประทับตราจริงๆ
+                            cell.classList.remove('cell-stamp-fx');
+                            void cell.offsetWidth; // trigger reflow เพื่อรีเซ็ต animation ให้เล่นซ้ำได้ทุกครั้ง
+                            cell.classList.add('cell-stamp-fx');
+                        }
                         playSynthSfx('pop');
                         if (navigator.vibrate) navigator.vibrate(15); // สั่นเบาๆ ตอนแตะทำเครื่องหมาย (มือถือที่รองรับ)
                         updateBingoProgress();
@@ -942,15 +1010,19 @@
         maxMarked = Math.max(maxMarked, diag1, diag2);
 
         const remaining = size - maxMarked;
+        const board = document.getElementById('bingo-board');
         if (remaining <= 0) {
             el.innerText = '🎉 ครบแนวแล้ว! กดปุ่ม BINGO ได้เลย!';
             el.className = 'text-center text-sm md:text-base font-bold text-emerald-400 mb-2 animate-pulse';
+            if (board) board.classList.add('board-near-bingo');
         } else if (remaining === 1) {
             el.innerText = '🔥 อีกแค่ 1 ช่องเดียวจะ BINGO!';
             el.className = 'text-center text-sm md:text-base font-bold text-amber-400 mb-2 animate-pulse';
+            if (board) board.classList.add('board-near-bingo'); // [ส่วนเพิ่ม] กระดานเรืองแสงกะพริบรอบขอบตอนใกล้ชนะ เพิ่มความลุ้นระทึก
         } else {
             el.innerText = `เหลืออีก ${remaining} ช่องจะ BINGO!`;
             el.className = 'text-center text-xs md:text-sm font-bold text-slate-400 mb-2';
+            if (board) board.classList.remove('board-near-bingo');
         }
     }
 
@@ -974,6 +1046,19 @@
             vHist.innerHTML = data.history.map(w => `<span class="bg-cyan-500/20 border border-cyan-500 text-cyan-300 px-3 py-1 rounded-xl font-bold">${w}</span>`).join('');
         }
 
+        // [ส่วนเพิ่ม] อัปเดตแถบข่าววิ่ง Live Feed บนจอผู้เล่น แสดง 3 คำล่าสุดที่เพิ่งประกาศ (ใหม่สุดอยู่ซ้าย)
+        const feedBar = document.getElementById('live-feed-bar');
+        const feedTrack = document.getElementById('live-feed-track');
+        if (feedBar && feedTrack) {
+            const last3 = data.history.slice(-3).reverse();
+            if (last3.length > 0) {
+                feedBar.classList.remove('hidden');
+                feedTrack.innerHTML = last3.map((w, i) => `<span class="bg-cyan-500/15 border border-cyan-500/40 text-cyan-200 px-2 py-0.5 rounded-lg ${i === 0 ? 'text-amber-300 border-amber-400/60 bg-amber-500/10' : ''}">${w}</span>`).join('');
+            } else {
+                feedBar.classList.add('hidden');
+            }
+        }
+
         const soundEnabled = document.getElementById('viewer-sound-toggle')?.checked;
         if (data.word && data.playSound && soundEnabled) {
             speakThai(data.word);
@@ -994,6 +1079,71 @@
         socket.emit('claim-bingo');
     }
 
+    // [ส่วนเพิ่ม] ข้อความเด้งให้กำลังใจ/กระตุ้นบรรยากาศ เมื่อมีผู้เข้าใกล้ BINGO หลายคน (ไม่กวนใจด้วยการเด้งถี่เกินไป)
+    let lastNearBingoToastAt = 0;
+    socket.on('near-bingo-update', (data) => {
+        if (isViewerMode) return; // จอกลางไม่ต้องมี toast รบกวน มีแค่ผู้เล่นเท่านั้นที่ควรเห็น
+        const now = Date.now();
+        if (now - lastNearBingoToastAt < 8000) return; // กันเด้งถี่เกินไป อย่างน้อยห่างกัน 8 วินาที
+        lastNearBingoToastAt = now;
+        Swal.fire({
+            toast: true,
+            position: 'top',
+            icon: 'info',
+            title: `🔥 มีผู้เข้าใกล้ BINGO แล้ว ${data.count} คน!`,
+            showConfirmButton: false,
+            timer: 2600,
+            timerProgressBar: true,
+            background: '#1e293b',
+            color: '#fbbf24'
+        });
+    });
+
+    // [ส่วนเพิ่ม] ตัวอย่างรูปแบบการชนะ (Mini-Grid): แสดงกระดานจิ๋วไฮไลต์รูปแบบ แนวนอน / แนวตั้ง / แนวทแยง 2 เส้น
+    function buildMiniGridHtml(highlightFn, size) {
+        let cells = '';
+        for (let r = 0; r < size; r++) {
+            for (let c = 0; c < size; c++) {
+                const on = highlightFn(r, c);
+                cells += `<div style="width:100%;aspect-ratio:1/1;border-radius:4px;background:${on ? '#10b981' : '#334155'};border:1px solid ${on ? '#059669' : '#475569'};"></div>`;
+            }
+        }
+        return `<div style="display:grid;grid-template-columns:repeat(${size},1fr);gap:3px;width:100%;">${cells}</div>`;
+    }
+
+    function openPatternPreviewModal() {
+        const size = boardSize || 5;
+        const mid = Math.floor(size / 2);
+        const patterns = [
+            { label: '🟩 แนวนอน 5 ช่อง', fn: (r, c) => r === mid },
+            { label: '🟩 แนวตั้ง', fn: (r, c) => c === mid },
+            { label: '🟩 แนวทแยง (ซ้ายบน → ขวาล่าง)', fn: (r, c) => r === c },
+            { label: '🟩 แนวทแยง (ขวาบน → ซ้ายล่าง)', fn: (r, c) => r === size - 1 - c }
+        ];
+
+        const html = `
+            <div style="text-align:left; font-size:0.85rem; line-height:1.5;">
+                <p style="margin-bottom:10px; color:#cbd5e1;">เมื่อสะสมคำครบ ${size} ช่องในแนวเดียวกัน (แนวใดแนวหนึ่งด้านล่าง) ให้กดปุ่ม <b style="color:#f472b6;">BINGO!</b> ได้ทันที</p>
+                <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:14px;">
+                    ${patterns.map(p => `
+                        <div style="text-align:center;">
+                            ${buildMiniGridHtml(p.fn, size)}
+                            <div style="margin-top:6px; font-size:0.72rem; font-weight:bold; color:#a7f3d0;">${p.label}</div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        Swal.fire({
+            title: '🏆 ตัวอย่างรูปแบบการชนะ',
+            html,
+            confirmButtonText: 'เข้าใจแล้ว',
+            confirmButtonColor: '#f59e0b',
+            width: '26rem'
+        });
+    }
+
     // [ส่วนปรับแก้] เมื่อ BINGO สำเร็จ ให้เปิดปุ่ม Floating รับของรางวัล (รูปแบบ B)
     socket.on('bingo-verified-winner', (data) => {
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
@@ -1001,6 +1151,13 @@
         hasPendingReward = true; // ห้ามให้ game-reset รีโหลดหน้าทิ้งจนกว่าจะกรอกที่อยู่เสร็จ
         document.getElementById('btn-floating-reward').classList.remove('hidden');
         openRewardModal();
+
+        // [ส่วนเพิ่ม] ปุ่ม BINGO เปลี่ยนเป็นสีเทาและกดซ้ำไม่ได้ เพราะผู้เล่นชนะไปแล้วในรอบนี้ (จะเปิดใช้งานใหม่อัตโนมัติเมื่อได้การ์ดใบใหม่ในรอบถัดไป)
+        const bingoBtn = document.getElementById('btn-bingo');
+        if (bingoBtn) {
+            bingoBtn.disabled = true;
+            bingoBtn.innerText = '✅ คุณ BINGO แล้วในรอบนี้';
+        }
     });
 
     // ฟังก์ชันเปิด Modal กรอกที่อยู่รับของรางวัล (แบบ B)
