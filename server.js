@@ -55,7 +55,7 @@ let gameState = {
 1. กรอกชื่อ-นามสกุล และหน่วยงาน/สังกัดให้ถูกต้องครบถ้วน เพื่อใช้อ้างอิงในการจัดส่งของรางวัล
 2. ผู้เล่น 1 ท่าน เลือกการ์ดบิงโกได้เพียง 1 ใบต่อ 1 รอบการเล่นเท่านั้น
 3. เมื่อผู้ดำเนินรายการประกาศคำศัพท์ ให้ตรวจสอบและทำเครื่องหมายในการ์ดของท่านหากมีคำนั้นปรากฏอยู่
-4. เมื่อทำเครื่องหมายได้ครบ 1 แนว (แนวนอน แนวตั้ง หรือแนวทแยง) ให้กดปุ่ม "BINGO!" ทันที
+4. เมื่อทำเครื่องหมายได้ครบ 1 แนว (แนวนอน แนวตั้ง หรือแนวทแยง) ให้กดปุ่ม "BINGO!" ทันที (กดปุ่ม 🏆 มุมซ้ายบนของจอ เพื่อดูตัวอย่างรูปแบบการชนะแบบภาพได้)
 5. ระบบจะตรวจสอบและยืนยันผลอัตโนมัติ ผู้ที่กด BINGO ถูกต้องคนแรกในแนวนั้นจะได้รับสิทธิ์รับของรางวัล
 6. กรุณากรอกเบอร์โทรศัพท์และที่อยู่จัดส่งของรางวัลให้ครบถ้วนและถูกต้องทันทีหลังระบบยืนยันว่าท่านชนะ
 7. การตัดสินของคณะผู้จัดกิจกรรมถือเป็นที่สิ้นสุด`
@@ -160,6 +160,46 @@ function checkBingoGrid(card, drawnWords, size) {
 // ตรวจการชนะแบบทั่วไป ใช้ได้กับกระดานทุกขนาดที่ระบบรองรับ (3x3, 4x4, 5x5, 6x6)
 function checkBingoWin(card, drawnWords, size) {
     return checkBingoGrid(card, drawnWords, size);
+}
+
+// [ส่วนเพิ่ม] คำนวณจำนวนช่องที่ทำเครื่องหมายได้มากที่สุดในแนวเดียวกัน (แถว/คอลัมน์/ทแยง) ของการ์ดหนึ่งใบ
+// ใช้ร่วมกับ countNearBingoPlayers() ด้านล่าง เพื่อดูว่าผู้เล่นคนนี้ "เหลืออีกกี่ช่อง" จะ BINGO
+function maxMarkedInLine(card, drawnWords, size) {
+    const marked = card.map(row => row.map(val => val === "FREE" || drawnWords.includes(val)));
+    let maxMarked = 0;
+    for (let r = 0; r < size; r++) {
+        const count = marked[r].filter(Boolean).length;
+        if (count > maxMarked) maxMarked = count;
+    }
+    for (let c = 0; c < size; c++) {
+        let count = 0;
+        for (let r = 0; r < size; r++) if (marked[r][c]) count++;
+        if (count > maxMarked) maxMarked = count;
+    }
+    let diag1 = 0, diag2 = 0;
+    for (let i = 0; i < size; i++) {
+        if (marked[i][i]) diag1++;
+        if (marked[i][size - 1 - i]) diag2++;
+    }
+    return Math.max(maxMarked, diag1, diag2);
+}
+
+// [ส่วนเพิ่ม] นับจำนวนผู้เล่นที่ "เหลืออีกแค่ 1 ช่องจะ BINGO" ในรอบปัจจุบัน (ไม่นับคนที่ BINGO ไปแล้วในรอบนี้)
+// ใช้ส่งข้อความให้กำลังใจ/กระตุ้นบรรยากาศ เช่น "มีผู้เข้าใกล้ BINGO แล้ว 3 คน!" ไปยังทุกจอ
+function countNearBingoPlayers() {
+    const winnerTokensThisRound = new Set(
+        gameState.winners.filter(w => w.roundNumber === gameState.roundNumber).map(w => w.token)
+    );
+    let count = 0;
+    for (const id in gameState.players) {
+        const player = gameState.players[id];
+        if (!player || !player.card) continue;
+        if (player.token && winnerTokensThisRound.has(player.token)) continue; // ไม่นับคนที่ BINGO ไปแล้ว
+        const size = gameState.boardSize;
+        const maxMarked = maxMarkedInLine(player.card, gameState.drawnWords, size);
+        if (size - maxMarked === 1) count++;
+    }
+    return count;
 }
 
 // ฟังก์ชันกลางสำหรับ "เปิดรอบใหม่" ใช้ร่วมกันทั้ง 2 ปุ่มของแอดมิน (Reset All / รอบใหม่คงผู้เล่นเดิม)
@@ -549,6 +589,12 @@ io.on('connection', (socket) => {
             history: gameState.drawnWords,
             playSound: playSound
         });
+
+        // [ส่วนเพิ่ม] แจ้งเตือนบรรยากาศ "มีผู้เข้าใกล้ BINGO แล้ว X คน!" หลังคำศัพท์ใหม่ออก เฉพาะตอนมีคนเข้าใกล้จริงๆ
+        const nearCount = countNearBingoPlayers();
+        if (nearCount > 0) {
+            io.emit('near-bingo-update', { count: nearCount });
+        }
     });
 
     // แอดมินกดเล่นเอฟเฟกต์เสียงสด (SFX Broadcast)
