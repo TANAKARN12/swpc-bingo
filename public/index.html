@@ -1012,17 +1012,36 @@
 
         const textCells = []; // เก็บเฉพาะช่องที่มีตัวหนังสือ (ไม่รวมช่อง FREE ที่เป็นรูปโลโก้) ไว้คำนวณไซซ์ร่วมกัน
 
-        myCard.forEach((row) => {
-            row.forEach((val) => {
+        // [ส่วนเพิ่ม] ชุดสีพื้นหลังสลับกันแบบ "หมากรุก" ให้ดูมีชีวิตชีวา สนุกน่าเล่น แทนสีเทาเข้มเดียวกันทั้งกระดานแบบเดิม
+        // เลือกโทนสีเข้มแบบ jewel-tone (น้ำเงิน/เขียวอมฟ้า/ม่วงคราม/ม่วงบานเย็น) ที่ตัวหนังสือสีขาวยังคงอ่านง่ายชัดเจนบนทุกสี
+        const CELL_PALETTE = [
+            '#1e3a5f', // น้ำเงินเข้ม
+            '#134e4a', // เขียวอมฟ้าเข้ม (teal)
+            '#312e81', // ม่วงครามเข้ม (indigo)
+            '#4c1d4e'  // ม่วงบานเย็นเข้ม (plum)
+        ];
+
+        myCard.forEach((row, r) => {
+            row.forEach((val, c) => {
                 const cell = document.createElement('button');
                 const isFree = val === "FREE";
                 // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด minFontSize แล้วยังไม่พอดี
                 // [ปรับปรุง] ให้ช่องคำศัพท์ "ติดกันไปเลย" ไม่มีช่องว่างระหว่างกัน (เดิมมี gap ทำให้ดูเป็นกระดานเล็กๆ กระจายกัน)
                 // ใช้ box-shadow บางๆ แทน border-2 เดิม กันไม่ให้เส้นแบ่งหนาเป็น 2 เท่าตรงรอยต่อระหว่างช่อง (inset shadow = เส้นบางสม่ำเสมอทุกด้าน)
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
-                cell.className = `w-full h-full font-extrabold p-1 flex items-center justify-center text-center bg-slate-700 text-slate-100 transition leading-[1.15] overflow-hidden whitespace-normal break-words ${isFree ? 'cell-marked' : ''}`;
-                cell.style.boxShadow = 'inset 0 0 0 1px rgba(71, 85, 105, 0.9)'; // เส้นแบ่งช่องบางๆ สม่ำเสมอ (slate-600)
-                cell.style.overflowWrap = 'anywhere'; // กันคำภาษาไทยยาวๆ ที่ไม่มีช่องว่างให้ตัดบรรทัดไม่ได้
+                cell.className = `w-full h-full font-extrabold p-1 flex items-center justify-center text-center text-white transition overflow-hidden whitespace-normal break-words ${isFree ? 'cell-marked' : ''}`;
+                cell.style.boxShadow = 'inset 0 0 0 1px rgba(255, 255, 255, 0.16)'; // เส้นแบ่งช่องบางๆ สีอ่อน ใช้ได้กับพื้นหลังทุกสีในชุดสี
+                // [ส่วนแก้ไข] เดิมใช้ overflow-wrap:anywhere ตัดคำตามจำนวนตัวอักษรล้วนๆ ทำให้สระ/วรรณยุกต์ไทย (เช่น สระอา) หลุดตกไปอยู่บรรทัดใหม่ตัวเดียวโดดๆ
+                // เปลี่ยนเป็น word-break:normal (ให้เบราว์เซอร์ตัดคำตามพจนานุกรมไทยผ่าน lang="th" ที่ตั้งไว้ที่ <html> ก่อน) และใช้ break-word เป็นทางเลือกสำรองสุดท้ายเท่านั้น
+                cell.style.wordBreak = 'normal';
+                cell.style.overflowWrap = 'break-word';
+                // [ส่วนแก้ไข] เพิ่มระยะห่างบรรทัดจาก 1.15 เป็น 1.5 กันสระบน-ล่าง/วรรณยุกต์ไทยชิดหรือทับกับบรรทัดถัดไปตอนคำยาวขึ้นหลายบรรทัด
+                cell.style.lineHeight = '1.5';
+                // [ส่วนเพิ่ม] เงาตัวอักษรบางๆ ช่วยให้ตัวหนังสือสีขาวคมชัด ไม่กลืนไปกับพื้นหลังไม่ว่าจะเป็นสีไหนในชุดสี
+                cell.style.textShadow = '0 1px 3px rgba(0, 0, 0, 0.6)';
+                if (!isFree) {
+                    cell.style.background = CELL_PALETTE[(r + c) % CELL_PALETTE.length];
+                }
 
                 // [ส่วนเพิ่ม] ช่อง FREE เปลี่ยนจากตัวหนังสือ "FREE" เป็นโลโก้สภาวิชาชีพฯ แทน
                 // วิธีติดตั้ง: นำไฟล์โลโก้ (พื้นหลังโปร่งใสจะสวยที่สุด) วางไว้ที่ public/images/council-logo.png ของโปรเจกต์
@@ -1038,13 +1057,17 @@
                     logo.style.pointerEvents = 'none';
                     logo.onerror = () => { cell.innerHTML = ''; cell.innerText = 'FREE'; };
                     cell.appendChild(logo);
+                    // [ส่วนแก้ไข] ช่อง FREE ถือเป็นฟรีให้อัตโนมัติอยู่แล้ว ไม่ควรกดแตะได้ (เดิมกดแล้วจะไปสลับ/ถอนสถานะ FREE ออกโดยไม่ตั้งใจ)
+                    cell.style.cursor = 'default';
+                    cell.tabIndex = -1;
+                    cell.setAttribute('aria-disabled', 'true');
                 } else {
                     cell.innerText = val;
                     textCells.push(cell);
                 }
 
-                cell.onclick = () => {
-                    if (isFree || drawnHistory.includes(val)) {
+                if (!isFree) cell.onclick = () => {
+                    if (drawnHistory.includes(val)) {
                         cell.classList.toggle('cell-marked');
                         if (cell.classList.contains('cell-marked')) {
                             // อนิเมชันปั๊มตราประทับสีทองตอนติ๊กเลือก ให้ความรู้สึกเหมือนประทับตราจริงๆ
