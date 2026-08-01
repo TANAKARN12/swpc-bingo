@@ -1041,6 +1041,26 @@
             guard++;
         }
 
+        // [ส่วนเพิ่ม] แก้บั๊กจากรูปตัวอย่างที่แนบมา: คำประสมยาวๆ ที่ไม่มีจุดตัดคำตามหลักภาษาไทยเลย (เช่น "นักสังคมสงเคราะห์")
+        // เบราว์เซอร์เข้าใจว่าเป็น "คำเดียว" ห้ามตัดกลางคำ (word-break:normal) ทำให้ต่อให้ลดฟอนต์จนถึงขั้นต่ำสุดของทั้งกระดานแล้วก็ยังกว้างเกินกรอบอยู่ดี
+        // ผลคือ text-align:center ทำให้ล้นออกทั้ง 2 ฝั่งเท่าๆ กัน แล้วโดน overflow-hidden ตัดตัวอักษรแรก/ตัวท้ายขาดหายไป (คำว่า "สังคมสงเคราะห์" เห็นแค่ "ังคมสงเคราะห์")
+        // แก้โดยเช็คเฉพาะช่องที่ยังล้นอยู่หลังลดฟอนต์จนสุดแล้ว (เคสพิเศษน้อยช่องมาก) ให้บังคับตัดคำได้ทุกตัวอักษรเป็นทางเลือกสุดท้ายจริงๆ
+        // และยอมให้ช่องนั้นเล็กกว่ามาตรฐานทั้งกระดานได้อีกนิด ดีกว่าปล่อยให้ตัวอักษรขาดหายไปแบบในบั๊กนี้
+        textCells.forEach(c => {
+            if (c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1) {
+                c.style.wordBreak = 'break-all';
+                c.style.overflowWrap = 'anywhere';
+                let soloSize = parseFloat(c.style.fontSize) || fontSize;
+                const hardFloor = 8; // ต่ำสุดจริงๆ เฉพาะเคสพิเศษนี้เท่านั้น (ทั้งกระดานยังคงใช้ minFontSize=11 ตามปกติ)
+                let g2 = 0;
+                while ((c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1) && soloSize > hardFloor && g2 < 30) {
+                    soloSize -= 0.5;
+                    c.style.fontSize = soloSize + 'px';
+                    g2++;
+                }
+            }
+        });
+
         textCells.forEach(c => { c.style.alignItems = ''; c.style.justifyContent = ''; }); // จัดกึ่งกลางกลับตามปกติ (กลับไปใช้ค่าจาก class .items-center/.justify-center เดิม)
     }
 
@@ -1094,8 +1114,8 @@
                     const logo = document.createElement('img');
                     logo.src = '/images/council-logo.png';
                     logo.alt = 'FREE';
-                    logo.style.width = '70%';
-                    logo.style.height = '70%';
+                    logo.style.width = '94%';
+                    logo.style.height = '94%';
                     logo.style.objectFit = 'contain';
                     logo.style.pointerEvents = 'none';
                     logo.onerror = () => { cell.innerHTML = ''; cell.innerText = 'FREE'; };
@@ -1132,6 +1152,13 @@
             });
         });
         fitBoardTextUniformly(textCells, boardSize); // วัดขนาดจริงหลัง DOM แสดงผลแล้ว หาไซซ์เดียวที่พอดีกับทุกช่องพร้อมกัน
+        // [ส่วนแก้ไข] แก้บั๊กจริงที่เป็นสาเหตุหลักของ "ตัวอักษรล้นขอบ/ขาดหาย" ที่ยังเจออยู่: ฟอนต์ Sarabun (โดยเฉพาะน้ำหนักตัวหนา 800 ที่ใช้จริง)
+        // อาจโหลดจาก Google Fonts ไม่เสร็จทันตอนที่ระบบวัดขนาดตัวอักษรครั้งแรก เบราว์เซอร์เลยวัดด้วยฟอนต์สำรอง (fallback) ที่ความกว้างตัวอักษรไม่ตรงกับ Sarabun จริง
+        // พอฟอนต์จริงโหลดเสร็จแล้วเปลี่ยนมาแสดงผล ตัวอักษรจะกว้างขึ้น/แคบลงจากที่วัดไว้ตอนแรก ทำให้ล้นขอบแบบสุ่มๆ (เกิดเฉพาะบางคำ บางครั้ง ตามจังหวะโหลดฟอนต์)
+        // แก้โดยรอสัญญาณ document.fonts.ready (ฟอนต์ทุกตัวที่ใช้บนหน้านี้โหลดเสร็จจริงแล้ว) แล้ว "วัดซ้ำอีกรอบ" ให้ชัวร์ว่าตัวเลขที่ได้อ้างอิงจากฟอนต์จริงเท่านั้น
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => { fitBoardTextUniformly(textCells, boardSize); }).catch(() => {});
+        }
         updateBingoProgress();
     }
 

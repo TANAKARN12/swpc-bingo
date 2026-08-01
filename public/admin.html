@@ -134,10 +134,10 @@
                     <select id="select-word" class="bg-slate-800 border-2 border-cyan-500/40 rounded-xl px-4 py-3.5 text-base font-bold text-cyan-300 w-full focus:outline-none focus:border-cyan-400 transition">
                         <option value="">-- เลือกคำศัพท์จากรายการ --</option>
                     </select>
-                    <button onclick="drawSelectedWord()" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black px-6 py-3.5 rounded-xl text-base shadow-lg hover:shadow-cyan-500/30 transition whitespace-nowrap active:scale-95">
+                    <button id="btn-draw-selected" onclick="drawSelectedWord()" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black px-6 py-3.5 rounded-xl text-base shadow-lg hover:shadow-cyan-500/30 transition whitespace-nowrap active:scale-95">
                         ประกาศคำนี้ 📢
                     </button>
-                    <button onclick="drawRandomWord()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-5 py-3.5 rounded-xl text-base shadow-lg transition whitespace-nowrap active:scale-95">
+                    <button id="btn-draw-random" onclick="drawRandomWord()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-5 py-3.5 rounded-xl text-base shadow-lg transition whitespace-nowrap active:scale-95">
                         🎲 สุ่มอัตโนมัติ
                     </button>
                     <button onclick="undoLastWord()" title="ย้อนกลับคำล่าสุดที่เพิ่งประกาศไป (เผื่อพลาด/กดผิด)" class="bg-slate-700 hover:bg-slate-600 text-rose-300 border border-rose-500/30 font-black px-5 py-3.5 rounded-xl text-base shadow-lg transition whitespace-nowrap active:scale-95">
@@ -576,6 +576,7 @@
         drawnWordsList = data.drawnWords || [];
         currentBoardSize = data.boardSize || 3;
         gameStarted = !!data.isGameStarted;
+        updateDrawButtonsEnabled();
         currentRound = data.roundNumber || 1;
         currentWaitingCount = data.waitingCount || 0;
 
@@ -742,6 +743,7 @@
         badge.innerText = '🟢 กำลังดำเนินเกมอยู่';
         badge.className = 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 px-4 py-1.5 rounded-full text-xs font-bold';
         gameStarted = true;
+        updateDrawButtonsEnabled();
     }
 
     function setGameStatusNotStarted() {
@@ -749,6 +751,19 @@
         badge.innerText = '⏳ ยังไม่เริ่มเกม';
         badge.className = 'bg-amber-500/20 text-amber-400 border border-amber-500/40 px-4 py-1.5 rounded-full text-xs font-bold animate-pulse';
         gameStarted = false;
+        stopAutoDraw(true); // [ส่วนเพิ่ม] แก้บั๊กจริง: เดิมถ้าเกมถูกรีเซ็ต/เปลี่ยนขนาดกระดานระหว่างเปิดโหมดสุ่มอัตโนมัติอยู่ ตัวจับเวลาจะยังทำงานต่อ วนแจ้งเตือน "ยังไม่เริ่มเกม" ทุกไม่กี่วินาทีไม่หยุด
+        updateDrawButtonsEnabled();
+    }
+
+    // [ส่วนเพิ่ม] ทำให้ปุ่มประกาศ/สุ่มคำ "ดูจางลงชัดเจน" เมื่อยังไม่เริ่มเกม เป็นสัญญาณภาพเสริมจากการแจ้งเตือน กันแอดมินกดพลาดตั้งแต่แรก
+    function updateDrawButtonsEnabled() {
+        ['btn-draw-selected', 'btn-draw-random', 'btn-auto-draw'].forEach((id) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.disabled = !gameStarted;
+            btn.classList.toggle('opacity-40', !gameStarted);
+            btn.classList.toggle('cursor-not-allowed', !gameStarted);
+        });
     }
 
     function startGame() {
@@ -795,6 +810,13 @@
     function toggleAutoDraw() {
         if (autoDrawTimer) { stopAutoDraw(false); return; }
 
+        // [ส่วนเพิ่ม] กันไว้ตั้งแต่จุดเริ่มต้นเลย ถ้ายังไม่เริ่มเกมจะไม่ให้เปิดโหมดสุ่มอัตโนมัติได้เลย
+        // (กันไม่ให้ drawRandomWord() ที่ถูกเรียกซ้ำทุกไม่กี่วินาทีจากตัวจับเวลา ขึ้นแจ้งเตือนซ้ำๆ รัวๆ จนรำคาญ)
+        if (!gameStarted) {
+            Swal.fire({ icon: 'warning', title: 'ยังไม่ได้เริ่มเกม', text: 'กรุณากด "เริ่มเกม" ก่อนครับ ถึงจะเปิดโหมดสุ่มอัตโนมัติได้', confirmButtonColor: '#f59e0b' });
+            return;
+        }
+
         const available = allWords.filter(w => !drawnWordsList.includes(w));
         if (available.length === 0) {
             Swal.fire({ icon: 'info', title: 'ประกาศคำศัพท์ครบหมดแล้วครับ!' });
@@ -817,6 +839,11 @@
     }
 
     function drawSelectedWord() {
+        // [ส่วนเพิ่ม] เช็คฝั่งแอดมินก่อนเลย ให้ตอบสนองทันทีไม่ต้องรอ round-trip ไปเซิร์ฟเวอร์ (เซิร์ฟเวอร์ก็เช็คซ้ำอีกชั้นเป็นด่านสุดท้ายอยู่แล้ว)
+        if (!gameStarted) {
+            Swal.fire({ icon: 'warning', title: 'ยังไม่ได้เริ่มเกม', text: 'กรุณากด "เริ่มเกม" ก่อนครับ ถึงจะสุ่ม/ประกาศคำศัพท์ได้', confirmButtonColor: '#f59e0b' });
+            return;
+        }
         const select = document.getElementById('select-word');
         const word = select.value;
         const playSound = document.getElementById('chk-sound').checked;
@@ -830,6 +857,10 @@
     }
 
     function drawRandomWord() {
+        if (!gameStarted) {
+            Swal.fire({ icon: 'warning', title: 'ยังไม่ได้เริ่มเกม', text: 'กรุณากด "เริ่มเกม" ก่อนครับ ถึงจะสุ่ม/ประกาศคำศัพท์ได้', confirmButtonColor: '#f59e0b' });
+            return;
+        }
         const available = allWords.filter(w => !drawnWordsList.includes(w));
         if (available.length === 0) {
             Swal.fire({ icon: 'info', title: 'ประกาศคำศัพท์ครบหมดแล้วครับ!' });
