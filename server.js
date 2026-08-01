@@ -45,6 +45,7 @@ let gameState = {
     roundNumber: 1, // เพิ่มทุกครั้งที่แอดมินกด Reset หรือเปิดรอบใหม่
     boardSize: 5, // ค่าเริ่มต้นของระบบคือ 5x5 (3/4/5/6 ปรับได้จากหน้าแอดมิน)
     maxPlayers: DEFAULT_MAX_PLAYERS, // จำนวนผู้เล่น/การ์ดสูงสุดต่อรอบ ปรับได้จากหน้าแอดมิน
+    lastNearBingoCount: 0, // [ส่วนเพิ่ม] เก็บค่าล่าสุดที่เคยแจ้งเตือน "ใกล้ BINGO" ไปแล้ว กันแจ้งเตือนซ้ำถี่เกินไปทุกครั้งที่ออกคำใหม่
     wordList: [...DEFAULT_WORD_LIST],
     drawnWords: [],
     players: {}, // socket.id -> player object (เฉพาะผู้เล่นที่ "ออนไลน์อยู่ตอนนี้" เท่านั้น)
@@ -192,6 +193,10 @@ function maxMarkedInLine(card, drawnWords, size) {
 
 // [ส่วนเพิ่ม] นับจำนวนผู้เล่นที่ "เหลืออีกแค่ 1 ช่องจะ BINGO" ในรอบปัจจุบัน (ไม่นับคนที่ BINGO ไปแล้วในรอบนี้)
 // ใช้ส่งข้อความให้กำลังใจ/กระตุ้นบรรยากาศ เช่น "มีผู้เข้าใกล้ BINGO แล้ว 3 คน!" ไปยังทุกจอ
+// [ส่วนแก้ไข] เดิมฟังก์ชันนี้คำนวณจาก "คำที่ประกาศไปแล้ว" เทียบกับการ์ด ทำให้ระบบนับว่าผู้เล่นใกล้ BINGO
+// ทั้งที่ผู้เล่นอาจจะยังไม่ได้กดติ๊กช่องเลยสักช่องก็ได้ (ดูไม่สมเหตุสมผล ผู้เล่นงงว่าทำไมระบบรู้)
+// ตอนนี้เปลี่ยนมาใช้ player.remaining ซึ่งอัปเดตจากฝั่งผู้เล่นเองทุกครั้งที่กดติ๊ก/ถอนติ๊กช่อง (ดู player-report-progress)
+// นับเฉพาะคนที่ "กดติ๊กเองจริงๆ" จนเหลืออีกแค่ 1 ช่องเท่านั้น
 function countNearBingoPlayers() {
     const winnerTokensThisRound = new Set(
         gameState.winners.filter(w => w.roundNumber === gameState.roundNumber).map(w => w.token)
@@ -201,9 +206,7 @@ function countNearBingoPlayers() {
         const player = gameState.players[id];
         if (!player || !player.card) continue;
         if (player.token && winnerTokensThisRound.has(player.token)) continue; // ไม่นับคนที่ BINGO ไปแล้ว
-        const size = gameState.boardSize;
-        const maxMarked = maxMarkedInLine(player.card, gameState.drawnWords, size);
-        if (size - maxMarked === 1) count++;
+        if (player.remaining === 1) count++;
     }
     return count;
 }
@@ -215,6 +218,7 @@ function countNearBingoPlayers() {
 //   (2) ผู้ที่กำลังรอคิวอยู่ (join-waiting-room) เรียงตามลำดับที่เข้าคิว
 //   รวมกันได้สูงสุดเท่า gameState.maxPlayers คน/รอบ (เท่าจำนวนการ์ดที่มี) ถ้าเกินโควตา คนที่เหลือจะถูกเก็บไว้ในคิวรอรอบถัดไปต่อไปอัตโนมัติ
 function startNewRound({ wipeRoster }) {
+    gameState.lastNearBingoCount = 0; // [ส่วนเพิ่ม] รอบใหม่ เริ่มนับการแจ้งเตือน "ใกล้ BINGO" ใหม่ตั้งแต่ต้น
     // ยกเลิกการนับถอยหลังที่ค้างอยู่ (ถ้ามี) กันเคสแอดมิน Reset ระหว่างที่กำลังนับถอยหลัง "เรดี้...โก!" อยู่พอดี
     if (gameState.countdownTimeout) {
         clearTimeout(gameState.countdownTimeout);
@@ -258,7 +262,8 @@ function startNewRound({ wipeRoster }) {
                 token,
                 avatar: baseInfo.avatar || AVATARS[Math.floor(Math.random() * AVATARS.length)],
                 card: cardObj.card,
-                cardId: cardObj.id
+                cardId: cardObj.id,
+                remaining: gameState.boardSize // การ์ดใบใหม่ ยังไม่ได้ติ๊กช่องไหนเลย รีเซ็ตค่าความคืบหน้า
             };
 
             gameState.playersByToken[token] = updated;
@@ -441,7 +446,8 @@ io.on('connection', (socket) => {
                 token,
                 name, surname, org, cardId,
                 card: cardObj.card,
-                avatar: avatar || fallbackAvatar
+                avatar: avatar || fallbackAvatar,
+                remaining: gameState.boardSize // [ส่วนเพิ่ม] จำนวนช่องที่ "ผู้เล่นกดติ๊กเองจริงๆ" ยังขาดอีกกี่ช่องจะครบแนว (อัปเดตจาก player-report-progress)
             };
 
             gameState.players[socket.id] = playerRecord;
@@ -631,11 +637,13 @@ io.on('connection', (socket) => {
             playSound: playSound
         });
 
-        // [ส่วนเพิ่ม] แจ้งเตือนบรรยากาศ "มีผู้เข้าใกล้ BINGO แล้ว X คน!" หลังคำศัพท์ใหม่ออก เฉพาะตอนมีคนเข้าใกล้จริงๆ
+        // [ปรับปรุง] แจ้งเตือนบรรยากาศ "มีผู้เข้าใกล้ BINGO แล้ว X คน!" เฉพาะตอนตัวเลขเปลี่ยนจากครั้งก่อนจริงๆ เท่านั้น
+        // (เดิมยิงทุกครั้งที่ออกคำใหม่ตราบใดที่ nearCount > 0 ทำให้ถี่เกินไปจนน่ารำคาญ)
         const nearCount = countNearBingoPlayers();
-        if (nearCount > 0) {
+        if (nearCount > 0 && nearCount !== gameState.lastNearBingoCount) {
             io.emit('near-bingo-update', { count: nearCount });
         }
+        gameState.lastNearBingoCount = nearCount;
     });
 
     // แอดมินกดเล่นเอฟเฟกต์เสียงสด (SFX Broadcast)
@@ -644,6 +652,16 @@ io.on('connection', (socket) => {
     });
 
     // ตรวจสอบสถานะ BINGO เมื่อมีคนกดปุ่ม BINGO!
+    // [ส่วนเพิ่ม] ผู้เล่นรายงานความคืบหน้าที่ตัวเอง "กดติ๊กเองจริงๆ" (ไม่ใช่คำนวณจากคำที่ประกาศไปแล้วเฉยๆ)
+    // ใช้สำหรับแจ้งเตือนบรรยากาศ "ใกล้ BINGO" ให้สมเหตุสมผล เฉพาะคนที่กดติ๊กจนเหลือ 1 ช่องจริงๆ เท่านั้น
+    socket.on('player-report-progress', (remaining) => {
+        const player = gameState.players[socket.id];
+        if (!player) return;
+        const n = parseInt(remaining, 10);
+        if (!Number.isFinite(n) || n < 0) return;
+        player.remaining = n;
+    });
+
     socket.on('claim-bingo', () => {
         const player = gameState.players[socket.id];
         if (player) {
@@ -700,12 +718,33 @@ io.on('connection', (socket) => {
             ...gameState.winners[winnerIdx],
             phone: info.phone || '-',
             address: info.address || '-',
-            addressComplete: true
+            addressComplete: true,
+            collectionMethod: 'delivery'
         };
 
         // ส่งข้อมูลผู้ชนะฉบับอัปเดตที่อยู่แล้วให้ Admin Dashboard
         io.emit('update-winners-list', gameState.winners);
-        socket.emit('winner-info-saved');
+        socket.emit('winner-info-saved', { collectionMethod: 'delivery' });
+    });
+
+    // [ส่วนเพิ่ม] ผู้ชนะเลือก "รับรางวัลแล้ว" (รับด้วยตนเองหน้างาน) ไม่ต้องกรอกเบอร์โทร/ที่อยู่
+    socket.on('submit-winner-collected', () => {
+        const token = socket.data.token || (gameState.players[socket.id] && gameState.players[socket.id].token);
+        if (!token) return;
+
+        const winnerIdx = gameState.winners.findIndex(w => w.token === token && !w.addressComplete);
+        if (winnerIdx === -1) return;
+
+        gameState.winners[winnerIdx] = {
+            ...gameState.winners[winnerIdx],
+            phone: '-',
+            address: 'รับของรางวัลด้วยตนเองแล้ว (ไม่ต้องจัดส่ง)',
+            addressComplete: true,
+            collectionMethod: 'pickup'
+        };
+
+        io.emit('update-winners-list', gameState.winners);
+        socket.emit('winner-info-saved', { collectionMethod: 'pickup' });
     });
 
     // แอดมินสั่งรีเซ็ตระบบเกมใหม่ทั้งหมด = ล้าง roster ทุกคน (รวมคนที่กำลังรอคิวด้วย) ทุกคนต้องกรอกชื่อ+เลือกการ์ดใหม่หมด
