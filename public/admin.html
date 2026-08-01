@@ -869,14 +869,32 @@
         }
     });
 
+    // [ส่วนแก้ไข] ปรับปรุงความแม่นยำการอ่านออกเสียงภาษาไทยฝั่งแอดมิน (พรีวิวเสียงในเครื่องแอดมินเอง) ให้เหมือนกับฝั่งผู้เล่น/จอกลาง
+    let cachedThaiVoice = null;
+    function pickThaiVoice() {
+        if (!('speechSynthesis' in window)) return null;
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices || !voices.length) return null;
+        return voices.find(v => v.lang === 'th-TH')
+            || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('th'))
+            || null;
+    }
+    if ('speechSynthesis' in window) {
+        cachedThaiVoice = pickThaiVoice();
+        window.speechSynthesis.onvoiceschanged = () => { cachedThaiVoice = pickThaiVoice(); };
+    }
+
     function speakThai(text) {
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'th-TH';
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
-        }
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const cleanText = text.replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'th-TH';
+        utterance.rate = 0.88;
+        utterance.pitch = 1;
+        const voice = cachedThaiVoice || pickThaiVoice();
+        if (voice) utterance.voice = voice;
+        window.speechSynthesis.speak(utterance);
     }
 
     function renderHistory(history) {

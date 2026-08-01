@@ -13,6 +13,9 @@
     <style>
         body { font-family: 'Sarabun', sans-serif; background: #0f172a; }
         .cell-marked { background: #10b981 !important; color: white !important; font-weight: bold; outline: 2px solid #059669; outline-offset: -2px; }
+        /* [ส่วนเพิ่ม] ช่อง FREE/โลโก้ ให้พื้นหลังเป็นสีขาวเสมอ แยกจากสีเขียว "ติ๊กแล้ว" ของช่องปกติ (ใช้ .cell-marked ร่วมกันไว้เพื่อการนับคะแนนเท่านั้น)
+           ต้องระบุ .cell-marked.cell-free (2 คลาสรวมกัน = specificity สูงกว่า .cell-marked เฉยๆ) ถึงจะชนะกฎสีเขียวด้านบนได้ */
+        .cell-marked.cell-free { background: #ffffff !important; color: #0f172a !important; outline-color: #cbd5e1; }
         .glow-text { text-shadow: 0 0 20px rgba(56, 189, 248, 0.6); }
         .countdown-number-anim { transition: transform 0.15s ease-out, color 0.2s, text-shadow 0.2s; text-shadow: 0 0 60px rgba(56, 189, 248, 0.8); }
 
@@ -416,6 +419,7 @@
     // ต้อง unlock ตรงจุดที่ผู้เล่น/ผู้ชมกดจริงๆ ไม่งั้นเสียงที่สั่งเล่นผ่าน socket event จะเงียบ
     function unlockAudio() {
         if (audioCtx.state === 'suspended') audioCtx.resume();
+        unlockApplauseAudioFiles(); // [ส่วนเพิ่ม] ปลดล็อกไฟล์เสียงปรบมือจริงพร้อมกันในจังหวะ user gesture เดียวกัน
     }
     document.addEventListener('click', function onceUnlock() {
         unlockAudio();
@@ -614,6 +618,33 @@
         'victory':      '/audio/applause-victory.mp3'
     };
     const _applauseAudioCache = {};
+    // [ส่วนเพิ่ม] แก้บั๊ก: เดิม unlockAudio() ปลดล็อกแค่ WebAudio (audioCtx) แต่ไม่ได้แตะไฟล์เสียงจริง (<audio> element) เลย
+    // มือถือ (โดยเฉพาะ iPhone/Safari) จะบล็อกการเล่นเสียงไฟล์จริงที่ถูกสั่งเล่นจาก socket event (ไม่ใช่การแตะหน้าจอโดยตรง)
+    // ทำให้แอดมินกดเล่นแล้วได้ยินเอง (เพราะเป็นการแตะจริงของแอดมิน) แต่ผู้เล่นไม่ได้ยินไฟล์เสียงจริงเลย (เงียบ หรือได้ยินแค่เสียงสังเคราะห์สำรอง)
+    // วิธีแก้: เตรียม/เล่นไฟล์เสียงแบบปิดเสียง (muted) สั้นๆ ตั้งแต่ตอนผู้เล่นแตะหน้าจอครั้งแรกจริงๆ เพื่อ "ปลดล็อก" ไฟล์เสียงไว้ล่วงหน้า
+    // ให้พร้อมเล่นเสียงจริงได้ทันทีเวลาแอดมินสั่งเล่นเสียงในภายหลังผ่าน socket
+    function unlockApplauseAudioFiles() {
+        Object.values(APPLAUSE_AUDIO_FILES).forEach((src) => {
+            try {
+                let base = _applauseAudioCache[src];
+                if (!base) {
+                    base = new Audio(src);
+                    base.preload = 'auto';
+                    _applauseAudioCache[src] = base;
+                }
+                base.muted = true;
+                const p = base.play();
+                if (p && typeof p.catch === 'function') {
+                    p.then(() => { base.pause(); base.currentTime = 0; base.muted = false; })
+                     .catch(() => { base.muted = false; }); // ไฟล์อาจยังไม่มีอยู่จริง เงียบไว้ ไม่ต้องแจ้งเตือนอะไร
+                } else {
+                    base.pause();
+                    base.currentTime = 0;
+                    base.muted = false;
+                }
+            } catch (e) { /* เงียบไว้ */ }
+        });
+    }
     function playRealApplause(type, fallbackFn) {
         const src = APPLAUSE_AUDIO_FILES[type] || '/audio/applause.mp3';
         try {
@@ -623,7 +654,11 @@
                 base.preload = 'auto';
                 _applauseAudioCache[src] = base;
             }
-            const player = base.cloneNode(); // เผื่อกดเล่นซ้อนกันเร็วๆ ให้เล่นทับกันได้ ไม่ตัดเสียงเดิม
+            // [ส่วนแก้ไข] เดิม clone element ใหม่ทุกครั้งที่เล่น (เผื่อเล่นซ้อนกัน) แต่ element โคลนใหม่จะไม่ได้รับสถานะ "ปลดล็อกแล้ว"
+            // จาก unlockApplauseAudioFiles() ทำให้ Safari บนมือถือ (โดยเฉพาะ iPhone) บล็อกเงียบๆ เวลาเล่นเสียงจาก socket event
+            // เปลี่ยนมาใช้ element เดิมที่ปลดล็อกไว้แล้วซ้ำ (เริ่มเล่นใหม่จากต้นถ้ามีการเล่นซ้อนกันเร็วๆ แทนการเล่นทับกัน)
+            const player = base;
+            player.currentTime = 0;
             player.volume = 0.9;
             let usedFallback = false;
             const doFallback = () => { if (!usedFallback && fallbackFn) { usedFallback = true; fallbackFn(); } };
@@ -1007,41 +1042,39 @@
 
         const board = document.getElementById('bingo-board');
         // ปรับจำนวนคอลัมน์ของกระดานให้ตรงกับขนาดที่แอดมินตั้งไว้ (3x3 / 4x4 / 5x5 / 6x6)
-        board.className = `grid grid-cols-${boardSize} mb-4 w-full aspect-square rounded-2xl overflow-hidden border-2 border-slate-600`;
+        // [ส่วนแก้ไข] เพิ่ม gap เล็กน้อยให้แต่ละช่องแยกออกจากกันชัดเจน (เดิมติดกันสนิทจนดูเป็นผืนเดียว อ่านแยกช่องยาก)
+        board.className = `grid grid-cols-${boardSize} gap-1 sm:gap-1.5 mb-4 w-full aspect-square rounded-2xl bg-slate-900 p-1 sm:p-1.5 border-2 border-slate-600`;
         board.innerHTML = '';
 
         const textCells = []; // เก็บเฉพาะช่องที่มีตัวหนังสือ (ไม่รวมช่อง FREE ที่เป็นรูปโลโก้) ไว้คำนวณไซซ์ร่วมกัน
 
-        // [ส่วนเพิ่ม] ชุดสีพื้นหลังสลับกันแบบ "หมากรุก" ให้ดูมีชีวิตชีวา สนุกน่าเล่น แทนสีเทาเข้มเดียวกันทั้งกระดานแบบเดิม
-        // เลือกโทนสีเข้มแบบ jewel-tone (น้ำเงิน/เขียวอมฟ้า/ม่วงคราม/ม่วงบานเย็น) ที่ตัวหนังสือสีขาวยังคงอ่านง่ายชัดเจนบนทุกสี
+        // [ส่วนแก้ไข] เดิมใช้ 4 สีเข้มสลับกันแบบลายตา ทำให้ดูมืดและลายจนอ่านยาก
+        // เปลี่ยนเป็นโทนสีอ่อนสลับกันแค่ 2 สีตามที่ขอ (ฟ้าอ่อน / เหลืองอำพันอ่อน) อ่านง่าย สบายตา ดูสดใสน่าเล่นแบบการ์ดเกมโชว์
+        // แต่ละสีมีขอบเข้มกับตัวหนังสือเข้มในโทนเดียวกัน (ไม่ใช่สีเขียว กันสับสนกับสีเขียว "ติ๊กแล้ว" ของช่องที่ทำเครื่องหมาย)
         const CELL_PALETTE = [
-            '#1e3a5f', // น้ำเงินเข้ม
-            '#134e4a', // เขียวอมฟ้าเข้ม (teal)
-            '#312e81', // ม่วงครามเข้ม (indigo)
-            '#4c1d4e'  // ม่วงบานเย็นเข้ม (plum)
+            { bg: '#e0f2fe', border: '#0284c7', text: '#075985' }, // ฟ้าอ่อน (sky) ขอบ/ตัวหนังสือฟ้าเข้ม
+            { bg: '#fef3c7', border: '#b45309', text: '#78350f' }  // เหลืองอำพันอ่อน (amber) ขอบ/ตัวหนังสือเหลืองเข้ม
         ];
 
         myCard.forEach((row, r) => {
             row.forEach((val, c) => {
                 const cell = document.createElement('button');
                 const isFree = val === "FREE";
+                const palette = CELL_PALETTE[(r + c) % CELL_PALETTE.length];
                 // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด minFontSize แล้วยังไม่พอดี
-                // [ปรับปรุง] ให้ช่องคำศัพท์ "ติดกันไปเลย" ไม่มีช่องว่างระหว่างกัน (เดิมมี gap ทำให้ดูเป็นกระดานเล็กๆ กระจายกัน)
-                // ใช้ box-shadow บางๆ แทน border-2 เดิม กันไม่ให้เส้นแบ่งหนาเป็น 2 เท่าตรงรอยต่อระหว่างช่อง (inset shadow = เส้นบางสม่ำเสมอทุกด้าน)
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
-                cell.className = `w-full h-full font-extrabold p-1 flex items-center justify-center text-center text-white transition overflow-hidden whitespace-normal break-words ${isFree ? 'cell-marked' : ''}`;
-                cell.style.boxShadow = 'inset 0 0 0 1px rgba(255, 255, 255, 0.16)'; // เส้นแบ่งช่องบางๆ สีอ่อน ใช้ได้กับพื้นหลังทุกสีในชุดสี
+                cell.className = `w-full h-full font-extrabold p-1 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
+                if (!isFree) {
+                    cell.style.background = palette.bg;
+                    cell.style.color = palette.text;
+                    cell.style.boxShadow = `inset 0 0 0 1.5px ${palette.border}55`; // เส้นขอบบางๆ สีเข้มกว่าพื้นหลังเล็กน้อย โทนเดียวกัน
+                }
                 // [ส่วนแก้ไข] เดิมใช้ overflow-wrap:anywhere ตัดคำตามจำนวนตัวอักษรล้วนๆ ทำให้สระ/วรรณยุกต์ไทย (เช่น สระอา) หลุดตกไปอยู่บรรทัดใหม่ตัวเดียวโดดๆ
                 // เปลี่ยนเป็น word-break:normal (ให้เบราว์เซอร์ตัดคำตามพจนานุกรมไทยผ่าน lang="th" ที่ตั้งไว้ที่ <html> ก่อน) และใช้ break-word เป็นทางเลือกสำรองสุดท้ายเท่านั้น
                 cell.style.wordBreak = 'normal';
                 cell.style.overflowWrap = 'break-word';
                 // [ส่วนแก้ไข] เพิ่มระยะห่างบรรทัดจาก 1.15 เป็น 1.5 กันสระบน-ล่าง/วรรณยุกต์ไทยชิดหรือทับกับบรรทัดถัดไปตอนคำยาวขึ้นหลายบรรทัด
                 cell.style.lineHeight = '1.5';
-                // [ส่วนเพิ่ม] เงาตัวอักษรบางๆ ช่วยให้ตัวหนังสือสีขาวคมชัด ไม่กลืนไปกับพื้นหลังไม่ว่าจะเป็นสีไหนในชุดสี
-                cell.style.textShadow = '0 1px 3px rgba(0, 0, 0, 0.6)';
-                if (!isFree) {
-                    cell.style.background = CELL_PALETTE[(r + c) % CELL_PALETTE.length];
-                }
 
                 // [ส่วนเพิ่ม] ช่อง FREE เปลี่ยนจากตัวหนังสือ "FREE" เป็นโลโก้สภาวิชาชีพฯ แทน
                 // วิธีติดตั้ง: นำไฟล์โลโก้ (พื้นหลังโปร่งใสจะสวยที่สุด) วางไว้ที่ public/images/council-logo.png ของโปรเจกต์
@@ -1185,14 +1218,35 @@
         }
     });
 
+    // [ส่วนแก้ไข] ปรับปรุงความแม่นยำการอ่านออกเสียงภาษาไทย (ใช้ร่วมกันทั้งฝั่งผู้เล่นและจอกลาง เพราะเรียก speakThai ตัวเดียวกัน)
+    // ปัญหาเดิม: ไม่ได้เลือกเสียงพูดภาษาไทยโดยเฉพาะ (ปล่อยให้เบราว์เซอร์เลือกเอง บางเครื่องได้เสียงที่ไม่ใช่ th-TH จริงๆ)
+    // และไม่ได้รอให้ลิสต์เสียงโหลดเสร็จก่อน (บางเบราว์เซอร์ โดยเฉพาะ Chrome โหลดเสียงแบบ async ทำให้ครั้งแรกอาจไม่เจอเสียงไทยเลย)
+    let cachedThaiVoice = null;
+    function pickThaiVoice() {
+        if (!('speechSynthesis' in window)) return null;
+        const voices = window.speechSynthesis.getVoices();
+        if (!voices || !voices.length) return null;
+        return voices.find(v => v.lang === 'th-TH')
+            || voices.find(v => v.lang && v.lang.toLowerCase().startsWith('th'))
+            || null;
+    }
+    if ('speechSynthesis' in window) {
+        cachedThaiVoice = pickThaiVoice();
+        window.speechSynthesis.onvoiceschanged = () => { cachedThaiVoice = pickThaiVoice(); };
+    }
+
     function speakThai(text) {
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel();
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'th-TH';
-            utterance.rate = 0.9;
-            window.speechSynthesis.speak(utterance);
-        }
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        // ตัดจุดแบบคำย่อออก (เช่น "พ.ร.บ." หรือ "สค.ร.") เพราะเอนจิ้นเสียงหลายตัวจะอ่านจุดเป็นคำว่า "จุด" แทรกกลางคำ ฟังไม่เป็นธรรมชาติ
+        const cleanText = text.replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'th-TH';
+        utterance.rate = 0.88;
+        utterance.pitch = 1;
+        const voice = cachedThaiVoice || pickThaiVoice();
+        if (voice) utterance.voice = voice; // ระบุเสียงไทยที่หาได้ชัดเจน แทนปล่อยให้เบราว์เซอร์เดาเอง
+        window.speechSynthesis.speak(utterance);
     }
 
     function claimBingo() {
@@ -1209,14 +1263,15 @@
         lastNearBingoToastAt = now;
         Swal.fire({
             toast: true,
-            position: 'top',
+            position: 'top-end', // [ส่วนแก้ไข] เดิม 'top' กว้างเต็มจอบัง ย้ายไปมุมขวาบนแทน เล็กลง ไม่บังเนื้อหา
             icon: 'info',
-            title: `🔥 มีผู้เล่นกดติ๊กจนใกล้ BINGO แล้ว ${data.count} คน!`,
+            title: `🔥 ใกล้ BINGO แล้ว ${data.count} คน!`,
             showConfirmButton: false,
-            timer: 2600,
+            timer: 2200,
             timerProgressBar: true,
             background: '#1e293b',
-            color: '#fbbf24'
+            color: '#fbbf24',
+            customClass: { popup: '!max-w-[12rem] !p-2 !text-xs !shadow-lg' } // [ส่วนแก้ไข] จำกัดความกว้าง+ลดขนาดตัวอักษร ให้เป็นแค่ป้ายเล็กๆ มุมจอ
         });
     });
 
