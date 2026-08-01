@@ -1017,11 +1017,20 @@
     // หาไซซ์ที่ใหญ่ที่สุดที่ทำให้ "ทุกช่อง" พอดีกรอบพร้อมกัน แล้วใช้ไซซ์เดียวกันนั้นกับทุกช่องในกระดาน
     function fitBoardTextUniformly(textCells, size) {
         if (!textCells.length) return;
-        const baseBySize = { 3: 21, 4: 18, 5: 16, 6: 13 };
+        const baseBySize = { 3: 22, 4: 19, 5: 17, 6: 14 };
         let fontSize = baseBySize[size] || baseBySize[3];
-        const minFontSize = 7.5;
+        // [ส่วนแก้ไข] เพิ่มขนาดฟอนต์ต่ำสุดจาก 7.5 เป็น 11px กันตัวเล็กจนผู้สูงอายุอ่านไม่ออก
+        // (ถ้าคำยาวมากจนต่ำกว่านี้ยังไม่พอดี ยอมให้ล้นเล็กน้อยแต่ถูกตัดด้วย overflow-hidden ดีกว่าอ่านไม่ออกเลย)
+        const minFontSize = 11;
         let guard = 0;
-        while (guard < 30) {
+
+        // [ส่วนแก้ไข] แก้บั๊กจริง: เดิมวัด overflow ขณะตัวหนังสือจัดกึ่งกลางแนวตั้ง-แนวนอนอยู่ (items-center/justify-center)
+        // เบราว์เซอร์บางตัว โดยเฉพาะ Safari/iOS วัด scrollHeight/scrollWidth ของเนื้อหาที่จัดกึ่งกลางได้ไม่แม่นยำ
+        // (เนื้อหาล้นออกทั้งสองด้านเท่าๆ กัน ทำให้ scrollHeight รายงานค่าน้อยกว่าที่ล้นจริง ระบบเลยเข้าใจผิดว่า "พอดีแล้ว" ทั้งที่จริงล้นขอบอยู่)
+        // แก้โดยชั่วคราวจัดชิดบน-ชิดซ้ายระหว่างวัดขนาด (วัดแม่นยำกว่ามาก) แล้วค่อยจัดกึ่งกลางกลับหลังหาไซซ์ที่พอดีแล้ว
+        textCells.forEach(c => { c.style.alignItems = 'flex-start'; c.style.justifyContent = 'flex-start'; });
+
+        while (guard < 40) {
             textCells.forEach(c => { c.style.fontSize = fontSize + 'px'; });
             let overflow = false;
             for (const c of textCells) {
@@ -1031,6 +1040,8 @@
             fontSize -= 0.5;
             guard++;
         }
+
+        textCells.forEach(c => { c.style.alignItems = ''; c.style.justifyContent = ''; }); // จัดกึ่งกลางกลับตามปกติ (กลับไปใช้ค่าจาก class .items-center/.justify-center เดิม)
     }
 
     function renderBingoBoard() {
@@ -1062,7 +1073,7 @@
                 const isFree = val === "FREE";
                 // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด minFontSize แล้วยังไม่พอดี
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
-                cell.className = `w-full h-full font-extrabold p-1 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
+                cell.className = `w-full h-full font-extrabold p-1.5 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
                 if (!isFree) {
                     cell.style.background = CELL_STYLE.bg;
                     cell.style.color = CELL_STYLE.text;
