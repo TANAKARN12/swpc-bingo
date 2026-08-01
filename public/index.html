@@ -15,7 +15,7 @@
         .cell-marked { background: #10b981 !important; color: white !important; font-weight: bold; outline: 2px solid #059669; outline-offset: -2px; }
         /* [ส่วนเพิ่ม] ช่อง FREE/โลโก้ ให้พื้นหลังเป็นสีขาวเสมอ แยกจากสีเขียว "ติ๊กแล้ว" ของช่องปกติ (ใช้ .cell-marked ร่วมกันไว้เพื่อการนับคะแนนเท่านั้น)
            ต้องระบุ .cell-marked.cell-free (2 คลาสรวมกัน = specificity สูงกว่า .cell-marked เฉยๆ) ถึงจะชนะกฎสีเขียวด้านบนได้ */
-        .cell-marked.cell-free { background: #ffffff !important; color: #0f172a !important; outline-color: #cbd5e1; }
+        .cell-marked.cell-free { background: #ffffff !important; color: #0f172a !important; outline: 2px solid #d97706; outline-offset: -2px; }
         .glow-text { text-shadow: 0 0 20px rgba(56, 189, 248, 0.6); }
         .countdown-number-anim { transition: transform 0.15s ease-out, color 0.2s, text-shadow 0.2s; text-shadow: 0 0 60px rgba(56, 189, 248, 0.8); }
 
@@ -632,16 +632,17 @@
                     base.preload = 'auto';
                     _applauseAudioCache[src] = base;
                 }
+                // [ส่วนแก้ไข] แก้บั๊กจริง: ผู้เล่น iPhone ได้ยินเสียงปรบมือดังขึ้นตอนกรอกชื่อ/กดลงทะเบียน
+                // สาเหตุ: เดิมรอ promise ของ play() ให้ resolve ก่อนค่อยสั่ง pause() ซึ่งบน iOS อาจมีช่วงเสี้ยววินาทีที่เสียงเล็ดลอดออกมาจริงแม้ตั้ง muted ไว้ก่อนแล้วก็ตาม
+                // แก้โดยตั้ง volume เป็น 0 เพิ่มอีกชั้น (กันเผื่อกรณี muted ทำงานไม่ทันที) และสั่ง pause() ทันทีแบบ synchronous ต่อจาก play() เลย ไม่รอ promise
                 base.muted = true;
+                base.volume = 0;
                 const p = base.play();
-                if (p && typeof p.catch === 'function') {
-                    p.then(() => { base.pause(); base.currentTime = 0; base.muted = false; })
-                     .catch(() => { base.muted = false; }); // ไฟล์อาจยังไม่มีอยู่จริง เงียบไว้ ไม่ต้องแจ้งเตือนอะไร
-                } else {
-                    base.pause();
-                    base.currentTime = 0;
-                    base.muted = false;
-                }
+                base.pause(); // หยุดทันทีแบบ synchronous ในติ๊กเดียวกัน กันเสียงหลุดแม้แต่เสี้ยววินาทีเดียว
+                base.currentTime = 0;
+                if (p && typeof p.catch === 'function') p.catch(() => {}); // เงียบไว้ ไม่ต้องแจ้งเตือนอะไร
+                // คืนค่าความดังกลับมาเป็นค่าเล่นจริงหลังจากรอบ event loop ปัจจุบันผ่านไปแล้ว กันชนกับคำสั่ง pause() ด้านบน
+                setTimeout(() => { base.muted = false; base.volume = 0.9; }, 60);
             } catch (e) { /* เงียบไว้ */ }
         });
     }
@@ -1043,31 +1044,29 @@
         const board = document.getElementById('bingo-board');
         // ปรับจำนวนคอลัมน์ของกระดานให้ตรงกับขนาดที่แอดมินตั้งไว้ (3x3 / 4x4 / 5x5 / 6x6)
         // [ส่วนแก้ไข] เพิ่ม gap เล็กน้อยให้แต่ละช่องแยกออกจากกันชัดเจน (เดิมติดกันสนิทจนดูเป็นผืนเดียว อ่านแยกช่องยาก)
-        board.className = `grid grid-cols-${boardSize} gap-1 sm:gap-1.5 mb-4 w-full aspect-square rounded-2xl bg-slate-900 p-1 sm:p-1.5 border-2 border-slate-600`;
+        // [ส่วนแก้ไข] แก้บั๊กจริง: เดิมกำหนดแค่ grid-cols แต่ไม่ได้กำหนด grid-rows ทำให้แต่ละแถวสูงไม่เท่ากันตามเนื้อหา (แถวที่มีคำยาวขึ้นหลายบรรทัดจะสูงกว่าแถวอื่น)
+        // ผลคือช่องมีสัดส่วนไม่เท่ากันทั้งกระดาน แถมทำให้ตัวชี้วัดขนาดฟอนต์ (fitBoardTextUniformly) วัดพื้นที่ผิดจนบีบฟอนต์เล็กเกินจำเป็น
+        // แก้โดยกำหนด grid-rows-${boardSize} ให้เท่ากับ grid-cols-${boardSize} บังคับทุกแถว/คอลัมน์ขนาดเท่ากันเป๊ะ ได้ช่องสี่เหลี่ยมจัตุรัสสม่ำเสมอทั้งกระดาน
+        board.className = `grid grid-cols-${boardSize} grid-rows-${boardSize} gap-1 sm:gap-1.5 mb-4 w-full aspect-square rounded-2xl bg-slate-900 p-1 sm:p-1.5 border-2 border-slate-600`;
         board.innerHTML = '';
 
         const textCells = []; // เก็บเฉพาะช่องที่มีตัวหนังสือ (ไม่รวมช่อง FREE ที่เป็นรูปโลโก้) ไว้คำนวณไซซ์ร่วมกัน
 
-        // [ส่วนแก้ไข] เดิมใช้ 4 สีเข้มสลับกันแบบลายตา ทำให้ดูมืดและลายจนอ่านยาก
-        // เปลี่ยนเป็นโทนสีอ่อนสลับกันแค่ 2 สีตามที่ขอ (ฟ้าอ่อน / เหลืองอำพันอ่อน) อ่านง่าย สบายตา ดูสดใสน่าเล่นแบบการ์ดเกมโชว์
-        // แต่ละสีมีขอบเข้มกับตัวหนังสือเข้มในโทนเดียวกัน (ไม่ใช่สีเขียว กันสับสนกับสีเขียว "ติ๊กแล้ว" ของช่องที่ทำเครื่องหมาย)
-        const CELL_PALETTE = [
-            { bg: '#e0f2fe', border: '#0284c7', text: '#075985' }, // ฟ้าอ่อน (sky) ขอบ/ตัวหนังสือฟ้าเข้ม
-            { bg: '#fef3c7', border: '#b45309', text: '#78350f' }  // เหลืองอำพันอ่อน (amber) ขอบ/ตัวหนังสือเหลืองเข้ม
-        ];
+        // [ส่วนแก้ไข] เดิมใช้ 2 สีสลับกันแบบหมากรุก (ฟ้า/เหลือง) แต่ผู้เล่นทดสอบแล้วบอกว่าดูสับสน (เข้าใจผิดว่าสีมีความหมายอะไรหรือเปล่า)
+        // เปลี่ยนเป็นสีเดียวสม่ำเสมอทั้งกระดาน อ่านง่าย ไม่ชวนสงสัย เหลือแค่สีเขียวของสถานะ "ติ๊กแล้ว" เป็นสีที่มีความหมายจริงๆ สีเดียวในกระดาน
+        const CELL_STYLE = { bg: '#f0f9ff', border: '#0284c7', text: '#0c4a6e' }; // ฟ้าอ่อนสบายตา ขอบ/ตัวหนังสือฟ้าเข้ม (โทนเดียวกับแบรนด์ของแอป)
 
         myCard.forEach((row, r) => {
             row.forEach((val, c) => {
                 const cell = document.createElement('button');
                 const isFree = val === "FREE";
-                const palette = CELL_PALETTE[(r + c) % CELL_PALETTE.length];
                 // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด minFontSize แล้วยังไม่พอดี
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
                 cell.className = `w-full h-full font-extrabold p-1 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
                 if (!isFree) {
-                    cell.style.background = palette.bg;
-                    cell.style.color = palette.text;
-                    cell.style.boxShadow = `inset 0 0 0 1.5px ${palette.border}55`; // เส้นขอบบางๆ สีเข้มกว่าพื้นหลังเล็กน้อย โทนเดียวกัน
+                    cell.style.background = CELL_STYLE.bg;
+                    cell.style.color = CELL_STYLE.text;
+                    cell.style.boxShadow = `inset 0 0 0 1.5px ${CELL_STYLE.border}55`; // เส้นขอบบางๆ สีเข้มกว่าพื้นหลังเล็กน้อย โทนเดียวกัน
                 }
                 // [ส่วนแก้ไข] เดิมใช้ overflow-wrap:anywhere ตัดคำตามจำนวนตัวอักษรล้วนๆ ทำให้สระ/วรรณยุกต์ไทย (เช่น สระอา) หลุดตกไปอยู่บรรทัดใหม่ตัวเดียวโดดๆ
                 // เปลี่ยนเป็น word-break:normal (ให้เบราว์เซอร์ตัดคำตามพจนานุกรมไทยผ่าน lang="th" ที่ตั้งไว้ที่ <html> ก่อน) และใช้ break-word เป็นทางเลือกสำรองสุดท้ายเท่านั้น
