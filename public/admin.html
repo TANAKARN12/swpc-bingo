@@ -73,6 +73,13 @@
                         <option value="5" selected>5x5 (24 คำ+FREE)</option>
                         <option value="6">6x6 (36 คำ)</option>
                     </select>
+                    <!-- [ส่วนเพิ่ม] จำนวนผู้เล่นสูงสุดต่อรอบ ปรับได้เอง (ค่าเริ่มต้น 100 คน, ตั้งได้ 10-300) -->
+                    <label class="flex items-center gap-1.5 bg-slate-800 border-2 border-amber-500/40 rounded-xl px-3 py-2 text-xs font-bold text-amber-300" title="จำนวนผู้เล่น/การ์ดสูงสุดต่อรอบ">
+                        👥
+                        <input id="input-max-players" type="number" min="10" max="300" step="1" value="100"
+                            class="w-14 bg-transparent focus:outline-none text-amber-300 font-bold" />
+                        <button onclick="setMaxPlayers()" title="บันทึกจำนวนผู้เล่นสูงสุด/รอบ" class="text-cyan-300 hover:text-cyan-200 font-black">✔</button>
+                    </label>
                     <button onclick="startGame()" title="เริ่มเกม" class="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-2.5 px-4 rounded-xl text-sm shadow-lg transition active:scale-95">
                         ▶ เริ่มเกม
                     </button>
@@ -294,6 +301,7 @@
     let allWords = [];
     let drawnWordsList = [];
     let currentBoardSize = 3;
+    let currentMaxPlayers = 100;
     let currentWinners = [];
     let gameStarted = false;
     let currentRound = 1;
@@ -451,16 +459,52 @@
         playSingleClap(ctx, goTime + 0.2, { volume: 0.9 }); // เสียงกระแทกตอน "โก!"
     }
 
+    // [ส่วนเพิ่ม] เล่นเสียงปรบมือจากไฟล์เสียงจริง (เช่น ดาวน์โหลดจาก Pixabay) แทนเสียงสังเคราะห์แบบเดิม
+    // ดูวิธีติดตั้งไฟล์เสียงในคอมเมนต์เดียวกันของ index.html (public/audio/*.mp3) — ใช้ชุดไฟล์เดียวกัน
+    const APPLAUSE_AUDIO_FILES = {
+        'clap-single':  '/audio/clap-single.mp3',
+        'clap-short':   '/audio/applause-short.mp3',
+        'clap-long':    '/audio/applause-long.mp3',
+        'clap-buildup': '/audio/applause-buildup.mp3',
+        'clap-cheer':   '/audio/applause-cheer.mp3',
+        'clap-thunder': '/audio/applause-thunder.mp3',
+        'victory':      '/audio/applause-victory.mp3'
+    };
+    const _applauseAudioCache = {};
+    function playRealApplause(type, fallbackFn) {
+        const src = APPLAUSE_AUDIO_FILES[type] || '/audio/applause.mp3';
+        try {
+            let base = _applauseAudioCache[src];
+            if (base === undefined) {
+                base = new Audio(src);
+                base.preload = 'auto';
+                _applauseAudioCache[src] = base;
+            }
+            const player = base.cloneNode();
+            player.volume = 0.9;
+            let usedFallback = false;
+            const doFallback = () => { if (!usedFallback && fallbackFn) { usedFallback = true; fallbackFn(); } };
+            player.addEventListener('error', doFallback, { once: true });
+            const playPromise = player.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch(doFallback);
+            }
+        } catch (e) {
+            if (fallbackFn) fallbackFn();
+        }
+    }
+
     function playSynthSfx(type) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
 
-        // เสียงปรบมือ/เชียร์ 6 แบบ ส่ง broadcast ไปเล่นที่ฝั่งผู้เล่น/จอกลางด้วยเสมอ (ดูท้ายฟังก์ชัน)
-        if (type === 'clap-single') { playSingleClap(audioCtx, audioCtx.currentTime, { volume: 0.7 }); socket.emit('admin-play-sfx', type); return; }
-        if (type === 'clap-short') { playApplause(audioCtx, { clapCount: 10, spread: 0.6 }); socket.emit('admin-play-sfx', type); return; }
-        if (type === 'clap-long') { playApplause(audioCtx, { clapCount: 30, spread: 2.2 }); socket.emit('admin-play-sfx', type); return; }
-        if (type === 'clap-buildup') { playApplause(audioCtx, { clapCount: 24, spread: 1.6, buildUp: true }); socket.emit('admin-play-sfx', type); return; }
-        if (type === 'clap-cheer') { playApplause(audioCtx, { clapCount: 26, spread: 1.8, cheer: true }); socket.emit('admin-play-sfx', type); return; }
-        if (type === 'clap-thunder') { playApplause(audioCtx, { clapCount: 45, spread: 2.5, cheer: true }); socket.emit('admin-play-sfx', type); return; }
+        // [ปรับปรุง] เสียงปรบมือ/เชียร์ 6 แบบ ส่ง broadcast ไปเล่นที่ฝั่งผู้เล่น/จอกลางด้วยเสมอ (ดูท้ายฟังก์ชัน)
+        // เปลี่ยนมาใช้ไฟล์เสียงจริงเป็นหลัก มีเสียงสังเคราะห์เดิมเป็น fallback อัตโนมัติ
+        if (type === 'clap-single') { playRealApplause(type, () => playSingleClap(audioCtx, audioCtx.currentTime, { volume: 0.7 })); socket.emit('admin-play-sfx', type); return; }
+        if (type === 'clap-short') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 10, spread: 0.6 })); socket.emit('admin-play-sfx', type); return; }
+        if (type === 'clap-long') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 30, spread: 2.2 })); socket.emit('admin-play-sfx', type); return; }
+        if (type === 'clap-buildup') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 24, spread: 1.6, buildUp: true })); socket.emit('admin-play-sfx', type); return; }
+        if (type === 'clap-cheer') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 26, spread: 1.8, cheer: true })); socket.emit('admin-play-sfx', type); return; }
+        if (type === 'clap-thunder') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 45, spread: 2.5, cheer: true })); socket.emit('admin-play-sfx', type); return; }
         if (type === 'ready-go') { playReadyGo(audioCtx); socket.emit('admin-play-sfx', type); return; }
 
         if (type === 'drumroll') {
@@ -536,6 +580,9 @@
         currentWaitingCount = data.waitingCount || 0;
 
         document.getElementById('select-board-size').value = String(currentBoardSize);
+        currentMaxPlayers = data.maxPlayers || 100;
+        document.getElementById('input-max-players').value = currentMaxPlayers;
+        document.getElementById('capacity-hint').innerText = currentMaxPlayers;
         updateWordDropdown();
         renderWordManageList();
         renderHistory(drawnWordsList);
@@ -641,7 +688,7 @@
         Swal.fire({ icon: 'warning', title: 'ทำรายการไม่สำเร็จ', text: msg, confirmButtonColor: '#f59e0b' });
     });
 
-    // แจ้งเตือนตอนเปิด "รอบใหม่ (คงผู้เล่นเดิม)" แล้วมีผู้เล่นเกินโควตา 30 ใบ/รอบ (ถูกเก็บไว้ในคิวรอรอบถัดไปอัตโนมัติ)
+    // แจ้งเตือนตอนเปิด "รอบใหม่ (คงผู้เล่นเดิม)" แล้วมีผู้เล่นเกินโควตาการ์ดที่ตั้งไว้/รอบ (ปรับได้จากช่อง 👥 ในหน้าแอดมิน) (ถูกเก็บไว้ในคิวรอรอบถัดไปอัตโนมัติ)
     socket.on('round-capacity-warning', (msg) => {
         Swal.fire({ icon: 'info', title: 'รอบนี้เต็มพอดี', text: msg, confirmButtonColor: '#06b6d4' });
     });
@@ -664,6 +711,30 @@
         renderWordManageList();
         setGameStatusNotStarted(); // เปลี่ยนขนาดกระดานจะเปิด Lobby ใหม่เสมอ (ผู้เล่นต้องเลือกการ์ดใหม่ก่อนเริ่มได้)
         Swal.fire({ icon: 'success', title: `ตั้งค่ากระดานเป็น ${currentBoardSize}x${currentBoardSize} แล้ว`, text: 'ผู้เล่นเดิมไม่ต้องกรอกชื่อซ้ำ แค่เลือกการ์ดใบใหม่เท่านั้น', timer: 1800, showConfirmButton: false });
+    });
+
+    // [ส่วนเพิ่ม] ปรับจำนวนผู้เล่น/การ์ดสูงสุดต่อรอบ (ค่าเริ่มต้น 100 คน ตั้งได้ 10-300 คน)
+    function setMaxPlayers() {
+        const input = document.getElementById('input-max-players');
+        let value = parseInt(input.value, 10);
+        if (!Number.isFinite(value)) { input.value = currentMaxPlayers; return; }
+        value = Math.max(10, Math.min(300, value));
+        input.value = value;
+
+        if (gameStarted) {
+            const proceed = confirm('เกมกำลังดำเนินอยู่ การเปลี่ยนจำนวนผู้เล่นสูงสุด/รอบจะสร้างชุดการ์ดใหม่ทั้งหมดและรีเซ็ตผู้เล่นที่เลือกการ์ดไว้ ต้องการดำเนินการต่อหรือไม่?');
+            if (!proceed) { input.value = currentMaxPlayers; return; }
+        }
+        socket.emit('admin-set-max-players', value);
+    }
+
+    socket.on('max-players-updated', (data) => {
+        currentMaxPlayers = data.maxPlayers;
+        document.getElementById('input-max-players').value = currentMaxPlayers;
+        document.getElementById('capacity-hint').innerText = currentMaxPlayers;
+        renderWordManageList();
+        setGameStatusNotStarted();
+        Swal.fire({ icon: 'success', title: `ตั้งค่าผู้เล่นสูงสุดเป็น ${currentMaxPlayers} คน/รอบ แล้ว`, text: 'ผู้เล่นเดิมไม่ต้องกรอกชื่อซ้ำ แค่เลือกการ์ดใบใหม่เท่านั้น', timer: 1800, showConfirmButton: false });
     });
 
     function setGameStatusStarted() {

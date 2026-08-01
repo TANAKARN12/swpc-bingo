@@ -108,11 +108,22 @@
             opacity: 0.75;
         }
 
-        /* [ส่วนเพิ่ม] ปรับกระดานให้ดูใหญ่ใช้พื้นที่ชัดเจนขึ้น + ตัวหนังสือคมชัดอ่านง่ายขึ้น */
-        #bingo-board button { line-height: 1.12; letter-spacing: -0.01em; }
-        @media (min-width: 420px) {
-            #app.app-wide { max-width: 34rem; }
+        /* [ส่วนเพิ่ม] ปรับกระดานให้ดูใหญ่ใช้พื้นที่ชัดเจนขึ้น + ตัวหนังสือคมชัดอ่านง่ายขึ้น
+           หมายเหตุ: ใช้ ID selector (#app) เพื่อให้ความจำเพาะสูงกว่า class ".max-w-md" ของ Tailwind
+           แก้ปัญหาเดิมที่คลาส .app-wide ไม่เคยถูกเพิ่มเข้า DOM จริง ทำให้กระดานไม่เคยขยายกว้างขึ้นจริงบนมือถือ/คอมพิวเตอร์ */
+        #app {
+            max-width: 26rem; /* มือถือจอเล็ก: กระดานเต็มความกว้างจอพอดี อ่านง่าย ไม่ล้นขอบ */
         }
+        @media (min-width: 400px) {
+            #app { max-width: 29rem; }
+        }
+        @media (min-width: 640px) {
+            #app { max-width: 34rem; }
+        }
+        @media (min-width: 900px) {
+            #app { max-width: 40rem; } /* จอคอมพิวเตอร์/แท็บเล็ต: กระดานบิงโกใหญ่ขึ้นชัดเจน อ่านสบายตา */
+        }
+        #bingo-board button { line-height: 1.12; letter-spacing: -0.01em; }
     </style>
 </head>
 <body class="text-white min-h-screen flex flex-col items-center justify-center p-3 relative">
@@ -122,15 +133,19 @@
         🎁 กรอกที่อยู่รับรางวัล
     </button>
 
-    <!-- [ส่วนเพิ่ม] ปุ่มไอคอน "i" เปิดดูเงื่อนไข/กติกาการเล่น (เนื้อหาแก้ไขได้จากหลังบ้าน ไม่ต้องแตะโค้ด) -->
-    <button id="btn-info-rules" onclick="openRulesModal()" title="เงื่อนไข/กติกาการเล่น" class="fixed top-4 left-4 z-50 w-11 h-11 flex items-center justify-center bg-slate-800/90 hover:bg-slate-700 text-cyan-300 border-2 border-cyan-500/40 rounded-full shadow-xl text-lg font-black transition active:scale-95">
-        ℹ️
-    </button>
+    <!-- [ส่วนเพิ่ม] ปุ่มไอคอน "i" เปิดดูเงื่อนไข/กติกาการเล่น (เนื้อหาแก้ไขได้จากหลังบ้าน ไม่ต้องแตะโค้ด)
+         [ปรับปรุง] จัดกลุ่มปุ่มลอย (info + pattern) เป็นแนวตั้งชิดกันในคอลัมน์เดียว ระยะห่างคงที่ทุกขนาดจอ
+         ลดขนาดเล็กน้อยบนจอแคบมาก (<380px) กันบังเนื้อหา และเพิ่มเงา/กรอบให้ดูพรีเมียมขึ้น -->
+    <div class="fixed top-3 left-3 z-50 flex flex-col gap-2.5">
+        <button id="btn-info-rules" onclick="openRulesModal()" title="เงื่อนไข/กติกาการเล่น" class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-cyan-300 border-2 border-cyan-500/50 rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.45)] text-base sm:text-lg font-black transition active:scale-90 backdrop-blur-md">
+            ℹ️
+        </button>
 
-    <!-- [ส่วนเพิ่ม] ปุ่มไอคอน "🏆" เปิดดูตัวอย่างรูปแบบการชนะ (Mini-Grid) แยกจากกติกาข้อความล้วน ให้กดดูเข้าใจง่ายเป็นภาพ -->
-    <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="fixed top-[4.25rem] left-4 z-50 w-11 h-11 flex items-center justify-center bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-2 border-amber-500/40 rounded-full shadow-xl text-lg font-black transition active:scale-95">
-        🏆
-    </button>
+        <!-- [ส่วนเพิ่ม] ปุ่มไอคอน "🏆" เปิดดูตัวอย่างรูปแบบการชนะ (Mini-Grid) แยกจากกติกาข้อความล้วน ให้กดดูเข้าใจง่ายเป็นภาพ -->
+        <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-amber-300 border-2 border-amber-500/50 rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.45)] text-base sm:text-lg font-black transition active:scale-90 backdrop-blur-md">
+            🏆
+        </button>
+    </div>
 
 
     <!-- [ส่วนเพิ่ม] Overlay นับถอยหลังสไตล์ไฟสตาร์ทรถแข่ง แสดงตอนแอดมินกด "เริ่มเกม" (ซิงค์เสียง+ภาพพร้อมกันทุกจอ) -->
@@ -215,7 +230,11 @@
             </div>
 
             <div id="game-board-area" class="hidden space-bg p-2.5 md:p-4">
-                <div class="bg-slate-900/60 backdrop-blur-sm p-3 rounded-2xl text-center mb-2 border border-cyan-500/30">
+                <div class="bg-slate-900/60 backdrop-blur-sm p-3 rounded-2xl text-center mb-2 border border-cyan-500/30 relative">
+                    <!-- [ส่วนเพิ่ม] สลับเสียงอ่านคำศัพท์บนมือถือผู้เล่นแต่ละคนเอง (เดิมมีแค่บนจอกลาง ทำให้ผู้เล่นไม่ได้ยินเสียงอ่านคำเลย) -->
+                    <label class="absolute top-2 right-2 flex items-center gap-1 text-[10px] text-slate-300 cursor-pointer bg-slate-800/70 px-2 py-1 rounded-full border border-slate-600/60">
+                        <input type="checkbox" id="player-sound-toggle" checked class="accent-cyan-500 w-3 h-3"> 🔊
+                    </label>
                     <div class="text-xs text-slate-400">คำศัพท์ล่าสุดที่ออก</div>
                     <div id="current-drawn-word" class="text-2xl md:text-3xl font-black text-amber-400 my-1">-</div>
                 </div>
@@ -569,18 +588,57 @@
         playSynthSfx('ready-go');
     });
 
+    // [ส่วนเพิ่ม] เล่นเสียงปรบมือจากไฟล์เสียงจริง (เช่น ดาวน์โหลดจาก Pixabay) แทนเสียงสังเคราะห์แบบเดิม
+    // วิธีติดตั้ง: ดาวน์โหลดไฟล์เสียงปรบมือ/เชียร์แบบ Royalty-Free จาก https://pixabay.com/sound-effects/search/applause/
+    // (กด Download ได้ฟรี ไม่ต้องใส่เครดิต) แล้ววางไฟล์ .mp3 ไว้ในโฟลเดอร์ public/audio/ ของโปรเจกต์ ตั้งชื่อไฟล์ตามด้านล่างนี้
+    // - หากมีไฟล์เสียงแยกตามประเภท (สั้น/ยาว/ก่อตัว/เชียร์/ฟ้าร้อง/ชัยชนะ) ระบบจะใช้ไฟล์นั้นโดยตรง ให้ความสมจริงสูงสุด
+    // - ถ้ายังไม่ได้อัปโหลดไฟล์ หรือไฟล์โหลดไม่สำเร็จ ระบบจะ fallback ไปใช้เสียงสังเคราะห์ (แบบเดิม) โดยอัตโนมัติ ไม่มีเสียงเงียบหาย
+    const APPLAUSE_AUDIO_FILES = {
+        'clap-single':  '/audio/clap-single.mp3',
+        'clap-short':   '/audio/applause-short.mp3',
+        'clap-long':    '/audio/applause-long.mp3',
+        'clap-buildup': '/audio/applause-buildup.mp3',
+        'clap-cheer':   '/audio/applause-cheer.mp3',
+        'clap-thunder': '/audio/applause-thunder.mp3',
+        'victory':      '/audio/applause-victory.mp3'
+    };
+    const _applauseAudioCache = {};
+    function playRealApplause(type, fallbackFn) {
+        const src = APPLAUSE_AUDIO_FILES[type] || '/audio/applause.mp3';
+        try {
+            let base = _applauseAudioCache[src];
+            if (base === undefined) {
+                base = new Audio(src);
+                base.preload = 'auto';
+                _applauseAudioCache[src] = base;
+            }
+            const player = base.cloneNode(); // เผื่อกดเล่นซ้อนกันเร็วๆ ให้เล่นทับกันได้ ไม่ตัดเสียงเดิม
+            player.volume = 0.9;
+            let usedFallback = false;
+            const doFallback = () => { if (!usedFallback && fallbackFn) { usedFallback = true; fallbackFn(); } };
+            player.addEventListener('error', doFallback, { once: true });
+            const playPromise = player.play();
+            if (playPromise && typeof playPromise.catch === 'function') {
+                playPromise.catch(doFallback);
+            }
+        } catch (e) {
+            if (fallbackFn) fallbackFn();
+        }
+    }
+
     function playSynthSfx(type) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
 
-        // เสียงปรบมือ/เชียร์ 6 แบบ แยกออกไปก่อน เพื่อไม่ปนกับ SFX แบบ oscillator เดี่ยวด้านล่าง
-        if (type === 'clap-single') { playSingleClap(audioCtx, audioCtx.currentTime, { volume: 0.7 }); return; }
-        if (type === 'clap-short') { playApplause(audioCtx, { clapCount: 10, spread: 0.6 }); return; }
-        if (type === 'clap-long') { playApplause(audioCtx, { clapCount: 30, spread: 2.2 }); return; }
-        if (type === 'clap-buildup') { playApplause(audioCtx, { clapCount: 24, spread: 1.6, buildUp: true }); return; }
-        if (type === 'clap-cheer') { playApplause(audioCtx, { clapCount: 26, spread: 1.8, cheer: true }); return; }
-        if (type === 'clap-thunder') { playApplause(audioCtx, { clapCount: 45, spread: 2.5, cheer: true }); return; }
+        // [ปรับปรุง] เสียงปรบมือ/เชียร์ 6 แบบ เปลี่ยนมาใช้ไฟล์เสียงจริงเป็นหลัก (playRealApplause)
+        // ยกเลิกเสียงสังเคราะห์แบบเดิมเป็นค่าเริ่มต้น แต่ยังคงไว้เป็นตัวสำรอง (fallback) อัตโนมัติเผื่อยังไม่ได้อัปโหลดไฟล์เสียงจริง
+        if (type === 'clap-single') { playRealApplause(type, () => playSingleClap(audioCtx, audioCtx.currentTime, { volume: 0.7 })); return; }
+        if (type === 'clap-short') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 10, spread: 0.6 })); return; }
+        if (type === 'clap-long') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 30, spread: 2.2 })); return; }
+        if (type === 'clap-buildup') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 24, spread: 1.6, buildUp: true })); return; }
+        if (type === 'clap-cheer') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 26, spread: 1.8, cheer: true })); return; }
+        if (type === 'clap-thunder') { playRealApplause(type, () => playApplause(audioCtx, { clapCount: 45, spread: 2.5, cheer: true })); return; }
         if (type === 'ready-go') { playReadyGo(audioCtx); return; }
-        if (type === 'victory') { playSynthSfx('tada'); playApplause(audioCtx, { clapCount: 34, spread: 2, cheer: true }); return; }
+        if (type === 'victory') { playSynthSfx('tada'); playRealApplause('victory', () => playApplause(audioCtx, { clapCount: 34, spread: 2, cheer: true })); return; }
 
         let osc = audioCtx.createOscillator();
         let gain = audioCtx.createGain();
@@ -1059,7 +1117,10 @@
             }
         }
 
-        const soundEnabled = document.getElementById('viewer-sound-toggle')?.checked;
+        // [ส่วนแก้ไข] เดิมเช็คแค่ #viewer-sound-toggle (มีอยู่เฉพาะจอกลาง) ทำให้จอผู้เล่นไม่เคยได้ยินเสียงอ่านคำเลย
+        // ตอนนี้เช็คทั้งสองปุ่ม: ถ้าเป็นจอกลางใช้ #viewer-sound-toggle, ถ้าเป็นจอผู้เล่นใช้ #player-sound-toggle ของตัวเอง
+        const soundToggle = document.getElementById('viewer-sound-toggle') || document.getElementById('player-sound-toggle');
+        const soundEnabled = soundToggle ? soundToggle.checked : false;
         if (data.word && data.playSound && soundEnabled) {
             speakThai(data.word);
         }
