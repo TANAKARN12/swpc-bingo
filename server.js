@@ -625,6 +625,12 @@ io.on('connection', (socket) => {
 
     // แอดมินสุ่ม/ประกาศคำศัพท์
     socket.on('admin-draw-word', (data) => {
+        // [ส่วนเพิ่ม] แก้บั๊กจริง: เดิมแอดมินกดสุ่มคำได้แม้ยังไม่ได้กด "เริ่มเกม" เลย แล้วคำจะถูกส่งไปจอกลาง/ผู้เล่นทันที
+        // ทั้งที่ผู้เล่นอาจยังเลือกการ์ดไม่เสร็จ หรือยังไม่พร้อม ป้องกันโดยบังคับให้ต้องกด "เริ่มเกม" ก่อนเสมอ ถึงจะสุ่ม/ประกาศคำศัพท์ได้
+        if (!gameState.isGameStarted) {
+            socket.emit('word-op-error', 'ยังไม่ได้กด "เริ่มเกม" ครับ กรุณาเริ่มเกมก่อน ถึงจะสุ่ม/ประกาศคำศัพท์ได้');
+            return;
+        }
         const { word, playSound } = data;
         if (!gameState.wordList.includes(word)) return;
         if (gameState.drawnWords.includes(word)) return;
