@@ -133,29 +133,21 @@
         @media (min-width: 1280px) {
             #app { max-width: 52rem; } /* จอคอมพิวเตอร์จอใหญ่/โปรเจกเตอร์: ขยายกว้างขึ้นอีกให้เต็มพื้นที่ */
         }
+        /* [ส่วนแก้ไข] แก้บั๊ก: โหมดจอกลาง (viewer) เดิมสลับคลาส .max-w-4xl แต่คลาสนี้ถูกกฎ #app (ID) ทับจนไม่มีผล
+           ทำให้จอกลางไม่กว้างขึ้นจริงตามที่ตั้งใจ ต้องใช้ ID+class ร่วมกันเพื่อให้ specificity สูงกว่า #app เฉยๆ */
+        #app.viewer-wide { max-width: 64rem; }
+        @media (min-width: 1280px) {
+            #app.viewer-wide { max-width: 84rem; }
+        }
         #bingo-board button { line-height: 1.12; letter-spacing: -0.01em; touch-action: manipulation; }
     </style>
 </head>
 <body class="text-white min-h-screen flex flex-col items-center justify-center p-3 relative">
 
     <!-- [ส่วนเพิ่ม] ปุ่ม Floating กรอกที่อยู่รับรางวัลสำหรับผู้ชนะ (รูปแบบ B) -->
-    <button id="btn-floating-reward" onclick="openRewardModal()" class="hidden fixed top-4 right-4 z-50 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-900 font-extrabold px-4 py-2.5 rounded-full shadow-2xl border-2 border-amber-200 flex items-center gap-2 animate-bounce">
-        🎁 กรอกที่อยู่รับรางวัล
+    <button id="btn-floating-reward" onclick="openRewardChoiceModal()" class="hidden fixed top-4 right-4 z-50 bg-gradient-to-r from-amber-400 to-amber-600 text-slate-900 font-extrabold px-4 py-2.5 rounded-full shadow-2xl border-2 border-amber-200 flex items-center gap-2 animate-bounce">
+        🎁 รับรางวัล
     </button>
-
-    <!-- [ส่วนเพิ่ม] ปุ่มไอคอน "i" เปิดดูเงื่อนไข/กติกาการเล่น (เนื้อหาแก้ไขได้จากหลังบ้าน ไม่ต้องแตะโค้ด)
-         [ปรับปรุง] จัดกลุ่มปุ่มลอย (info + pattern) เป็นแนวตั้งชิดกันในคอลัมน์เดียว ระยะห่างคงที่ทุกขนาดจอ
-         ลดขนาดเล็กน้อยบนจอแคบมาก (<380px) กันบังเนื้อหา และเพิ่มเงา/กรอบให้ดูพรีเมียมขึ้น -->
-    <div class="fixed top-3 left-3 z-50 flex flex-col gap-2.5">
-        <button id="btn-info-rules" onclick="openRulesModal()" title="เงื่อนไข/กติกาการเล่น" class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-cyan-300 border-2 border-cyan-500/50 rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.45)] text-base sm:text-lg font-black transition active:scale-90 backdrop-blur-md">
-            ℹ️
-        </button>
-
-        <!-- [ส่วนเพิ่ม] ปุ่มไอคอน "🏆" เปิดดูตัวอย่างรูปแบบการชนะ (Mini-Grid) แยกจากกติกาข้อความล้วน ให้กดดูเข้าใจง่ายเป็นภาพ -->
-        <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center bg-gradient-to-br from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 text-amber-300 border-2 border-amber-500/50 rounded-full shadow-[0_4px_14px_rgba(0,0,0,0.45)] text-base sm:text-lg font-black transition active:scale-90 backdrop-blur-md">
-            🏆
-        </button>
-    </div>
 
 
     <!-- [ส่วนเพิ่ม] Overlay นับถอยหลังสไตล์ไฟสตาร์ทรถแข่ง แสดงตอนแอดมินกด "เริ่มเกม" (ซิงค์เสียง+ภาพพร้อมกันทุกจอ) -->
@@ -178,9 +170,18 @@
 
     <div id="app" class="w-full max-w-md bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl p-3 sm:p-5 border border-cyan-500/30 transition-all duration-300">
         
-        <div id="header-brand" class="text-center mb-4">
-            <h1 class="text-2xl font-extrabold text-cyan-400">สภาวิชาชีพสังคมสงเคราะห์</h1>
-            <p class="text-xs text-slate-400">SWPC BINGO ONLINE</p>
+        <div id="header-brand" class="flex items-center justify-between gap-2 mb-4">
+            <!-- [ส่วนแก้ไข] ย้ายปุ่มกติกา/ตัวอย่างการชนะ จากลอยทับกระดาน มาฝังซ้าย-ขวาของชื่อสภาฯ แทน อ่านง่ายขึ้น ไม่บังเนื้อหา -->
+            <button id="btn-info-rules" onclick="openRulesModal()" title="เงื่อนไข/กติกาการเล่น" class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 text-cyan-300 border-2 border-cyan-500/50 rounded-full shadow-md text-base sm:text-lg font-black transition active:scale-90">
+                ℹ️
+            </button>
+            <div class="text-center min-w-0">
+                <h1 class="text-lg sm:text-2xl font-extrabold text-cyan-400 truncate">สภาวิชาชีพสังคมสงเคราะห์</h1>
+                <p class="text-xs text-slate-400">SWPC BINGO ONLINE</p>
+            </div>
+            <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 text-amber-300 border-2 border-amber-500/50 rounded-full shadow-md text-base sm:text-lg font-black transition active:scale-90">
+                🏆
+            </button>
         </div>
 
         <!-- STEP 1: หน้าลงทะเบียน -->
@@ -376,7 +377,7 @@
             document.getElementById('step-game').classList.add('hidden');
             document.getElementById('step-select-card').classList.remove('hidden');
 
-            if (data.pendingWinner) openRewardModal();
+            if (data.pendingWinner) openRewardChoiceModal();
         } else if (data.player && data.card) {
             // roster ยังอยู่ -> พาเข้าเกม/ห้องรอเดิมทันที ไม่ต้องกรอกชื่อซ้ำ
             playerData = { name: data.player.name, surname: data.player.surname, org: data.player.org, avatar: data.player.avatar };
@@ -395,13 +396,13 @@
 
             if (data.pendingWinner) {
                 // ชนะไปแล้วในรอบก่อนแต่ยังกรอกที่อยู่ไม่เสร็จ เปิด modal ให้กรอกต่อได้เลย
-                openRewardModal();
+                openRewardChoiceModal();
             }
         } else if (data.pendingWinner) {
             // roster ถูกล้างไปแล้ว (แอดมินกด "รีเซ็ตทั้งหมด") แต่ยังมีของรางวัลค้างกรอกที่อยู่อยู่
             // ให้ผู้เล่นกรอกที่อยู่ได้อย่างเดียว ไม่บังคับให้ลงทะเบียนใหม่
             document.getElementById('step-register').classList.add('hidden');
-            openRewardModal();
+            openRewardChoiceModal();
         }
         // กรณีไม่มีทั้ง player และ pendingWinner จะไม่เกิดขึ้น เพราะ server เช็คแล้วก่อนส่ง event นี้มา
     });
@@ -754,7 +755,7 @@
         
         const app = document.getElementById('app');
         app.classList.remove('max-w-md');
-        app.classList.add('max-w-4xl');
+        app.classList.add('viewer-wide');
         
         document.getElementById('step-viewer').classList.remove('hidden');
         updateViewerStatus();
@@ -975,27 +976,23 @@
         renderBingoBoard();
     });
 
-    // คำนวณขนาดตัวอักษรเริ่มต้นต่อช่อง (จุดเริ่มก่อนค่อยๆ ลดจริงด้วยการวัดขนาดจริงใน fitTextToCell)
-    function getCellFontSizePx(word, size) {
-        const baseBySize = { 3: 22, 4: 17, 5: 15, 6: 12 };
-        let px = baseBySize[size] || baseBySize[3];
-        const len = (word || '').length;
-        if (len > 12) px *= 0.5;
-        else if (len > 9) px *= 0.62;
-        else if (len > 7) px *= 0.74;
-        else if (len > 5) px *= 0.88;
-        return Math.max(px, 7.5);
-    }
-
-    // ลดขนาดตัวอักษรลงทีละนิดจนกว่าเนื้อหาจะพอดีกับกล่องจริงๆ (วัดจาก scrollHeight/scrollWidth เทียบกับขนาดกล่องจริง)
-    // นี่คือตัวช่วยหลักที่การันตีว่าข้อความจะไม่มีวันล้นออกนอกกรอบ ไม่ว่าคำจะยาวแค่ไหนหรือกระดานขนาดใดก็ตาม
-    function fitTextToCell(cell) {
-        let fontSize = parseFloat(cell.style.fontSize) || 14;
-        const minFontSize = 6;
+    // [ส่วนแก้ไข] เดิมคำนวณขนาดฟอนต์แยกทีละช่องตามความยาวคำ ทำให้แต่ละช่องมีขนาดตัวอักษรไม่เท่ากัน ดูไม่เป็นระเบียบ
+    // ตอนนี้เปลี่ยนเป็น "ขนาดเดียวกันทั้งกระดาน" โดยอนุญาตให้คำยาวๆ ขึ้นบรรทัดใหม่ได้ (สูงสุด ~3 บรรทัด) แทนการลดฟอนต์จนเล็กจิ๋วช่องเดียว
+    // หาไซซ์ที่ใหญ่ที่สุดที่ทำให้ "ทุกช่อง" พอดีกรอบพร้อมกัน แล้วใช้ไซซ์เดียวกันนั้นกับทุกช่องในกระดาน
+    function fitBoardTextUniformly(textCells, size) {
+        if (!textCells.length) return;
+        const baseBySize = { 3: 21, 4: 18, 5: 16, 6: 13 };
+        let fontSize = baseBySize[size] || baseBySize[3];
+        const minFontSize = 7.5;
         let guard = 0;
-        while ((cell.scrollHeight > cell.clientHeight + 1 || cell.scrollWidth > cell.clientWidth + 1) && fontSize > minFontSize && guard < 40) {
+        while (guard < 30) {
+            textCells.forEach(c => { c.style.fontSize = fontSize + 'px'; });
+            let overflow = false;
+            for (const c of textCells) {
+                if (c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1) { overflow = true; break; }
+            }
+            if (!overflow || fontSize <= minFontSize) break;
             fontSize -= 0.5;
-            cell.style.fontSize = fontSize + 'px';
             guard++;
         }
     }
@@ -1013,15 +1010,19 @@
         board.className = `grid grid-cols-${boardSize} mb-4 w-full aspect-square rounded-2xl overflow-hidden border-2 border-slate-600`;
         board.innerHTML = '';
 
+        const textCells = []; // เก็บเฉพาะช่องที่มีตัวหนังสือ (ไม่รวมช่อง FREE ที่เป็นรูปโลโก้) ไว้คำนวณไซซ์ร่วมกัน
+
         myCard.forEach((row) => {
             row.forEach((val) => {
                 const cell = document.createElement('button');
                 const isFree = val === "FREE";
-                // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ fitTextToCell ลดจนสุด minFontSize แล้วยังไม่พอดี
+                // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด minFontSize แล้วยังไม่พอดี
                 // [ปรับปรุง] ให้ช่องคำศัพท์ "ติดกันไปเลย" ไม่มีช่องว่างระหว่างกัน (เดิมมี gap ทำให้ดูเป็นกระดานเล็กๆ กระจายกัน)
                 // ใช้ box-shadow บางๆ แทน border-2 เดิม กันไม่ให้เส้นแบ่งหนาเป็น 2 เท่าตรงรอยต่อระหว่างช่อง (inset shadow = เส้นบางสม่ำเสมอทุกด้าน)
-                cell.className = `w-full h-full font-extrabold p-1 flex items-center justify-center text-center bg-slate-700 text-slate-100 transition leading-[1.15] overflow-hidden ${isFree ? 'cell-marked' : ''}`;
+                // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
+                cell.className = `w-full h-full font-extrabold p-1 flex items-center justify-center text-center bg-slate-700 text-slate-100 transition leading-[1.15] overflow-hidden whitespace-normal break-words ${isFree ? 'cell-marked' : ''}`;
                 cell.style.boxShadow = 'inset 0 0 0 1px rgba(71, 85, 105, 0.9)'; // เส้นแบ่งช่องบางๆ สม่ำเสมอ (slate-600)
+                cell.style.overflowWrap = 'anywhere'; // กันคำภาษาไทยยาวๆ ที่ไม่มีช่องว่างให้ตัดบรรทัดไม่ได้
 
                 // [ส่วนเพิ่ม] ช่อง FREE เปลี่ยนจากตัวหนังสือ "FREE" เป็นโลโก้สภาวิชาชีพฯ แทน
                 // วิธีติดตั้ง: นำไฟล์โลโก้ (พื้นหลังโปร่งใสจะสวยที่สุด) วางไว้ที่ public/images/council-logo.png ของโปรเจกต์
@@ -1038,8 +1039,8 @@
                     logo.onerror = () => { cell.innerHTML = ''; cell.innerText = 'FREE'; };
                     cell.appendChild(logo);
                 } else {
-                    cell.style.fontSize = getCellFontSizePx(val, boardSize) + 'px';
                     cell.innerText = val;
+                    textCells.push(cell);
                 }
 
                 cell.onclick = () => {
@@ -1062,9 +1063,9 @@
                     }
                 };
                 board.appendChild(cell);
-                if (!isFree) fitTextToCell(cell); // วัดขนาดจริงหลัง DOM แสดงผลแล้ว ค่อยๆ ลดฟอนต์จนพอดีกล่องเป๊ะ (ช่อง FREE เป็นรูปโลโก้ ไม่ต้องปรับฟอนต์)
             });
         });
+        fitBoardTextUniformly(textCells, boardSize); // วัดขนาดจริงหลัง DOM แสดงผลแล้ว หาไซซ์เดียวที่พอดีกับทุกช่องพร้อมกัน
         updateBingoProgress();
     }
 
@@ -1101,6 +1102,8 @@
         maxMarked = Math.max(maxMarked, diag1, diag2);
 
         const remaining = size - maxMarked;
+        // [ส่วนเพิ่ม] ส่งความคืบหน้าที่ "กดติ๊กเองจริงๆ" กลับไปเซิร์ฟเวอร์ ใช้ตัดสินใจแจ้งเตือน "ใกล้ BINGO" ให้สมเหตุสมผล
+        socket.emit('player-report-progress', remaining);
         const board = document.getElementById('bingo-board');
         if (remaining <= 0) {
             el.innerText = '🎉 ครบแนวแล้ว! กดปุ่ม BINGO ได้เลย!';
@@ -1174,17 +1177,18 @@
     }
 
     // [ส่วนเพิ่ม] ข้อความเด้งให้กำลังใจ/กระตุ้นบรรยากาศ เมื่อมีผู้เข้าใกล้ BINGO หลายคน (ไม่กวนใจด้วยการเด้งถี่เกินไป)
+    // [ปรับปรุง] เซิร์ฟเวอร์แจ้งเฉพาะตอนตัวเลขเปลี่ยนจริงๆ แล้ว แต่ฝั่งนี้ยังกันเผื่อไว้อีกชั้น ห่างกันอย่างน้อย 20 วินาที
     let lastNearBingoToastAt = 0;
     socket.on('near-bingo-update', (data) => {
         if (isViewerMode) return; // จอกลางไม่ต้องมี toast รบกวน มีแค่ผู้เล่นเท่านั้นที่ควรเห็น
         const now = Date.now();
-        if (now - lastNearBingoToastAt < 8000) return; // กันเด้งถี่เกินไป อย่างน้อยห่างกัน 8 วินาที
+        if (now - lastNearBingoToastAt < 20000) return; // กันเด้งถี่เกินไป อย่างน้อยห่างกัน 20 วินาที
         lastNearBingoToastAt = now;
         Swal.fire({
             toast: true,
             position: 'top',
             icon: 'info',
-            title: `🔥 มีผู้เข้าใกล้ BINGO แล้ว ${data.count} คน!`,
+            title: `🔥 มีผู้เล่นกดติ๊กจนใกล้ BINGO แล้ว ${data.count} คน!`,
             showConfirmButton: false,
             timer: 2600,
             timerProgressBar: true,
@@ -1246,7 +1250,7 @@
         if (navigator.vibrate) navigator.vibrate([100, 60, 100, 60, 200]); // สั่นฉลองแรงกว่าปกติเฉพาะเครื่องผู้ชนะ
         hasPendingReward = true; // ห้ามให้ game-reset รีโหลดหน้าทิ้งจนกว่าจะกรอกที่อยู่เสร็จ
         document.getElementById('btn-floating-reward').classList.remove('hidden');
-        openRewardModal();
+        openRewardChoiceModal();
 
         // [ส่วนเพิ่ม] ปุ่ม BINGO เปลี่ยนเป็นสีเทาและกดซ้ำไม่ได้ เพราะผู้เล่นชนะไปแล้วในรอบนี้ (จะเปิดใช้งานใหม่อัตโนมัติเมื่อได้การ์ดใบใหม่ในรอบถัดไป)
         const bingoBtn = document.getElementById('btn-bingo');
@@ -1256,10 +1260,37 @@
         }
     });
 
-    // ฟังก์ชันเปิด Modal กรอกที่อยู่รับของรางวัล (แบบ B)
-    function openRewardModal() {
+    // [ส่วนเพิ่ม] ผู้ชนะเลือกก่อนว่าจะรับรางวัลแบบไหน กันกรอกที่อยู่ทั้งที่รับหน้างานไปแล้ว
+    function openRewardChoiceModal() {
         Swal.fire({
             title: '🎉 ยินดีด้วย คุณ BINGO สำเร็จ!',
+            text: 'กรุณาเลือกวิธีรับรางวัลของคุณ:',
+            icon: 'success',
+            showDenyButton: true,
+            showCancelButton: true,
+            confirmButtonText: '🤝 รับรางวัลแล้ว',
+            denyButtonText: '📦 ต้องการให้จัดส่งรางวัล',
+            cancelButtonText: 'ไว้เลือกทีหลัง',
+            confirmButtonColor: '#0891b2',
+            denyButtonColor: '#f59e0b',
+            cancelButtonColor: '#64748b',
+            background: '#ffffff',
+            color: '#1e293b'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // รับรางวัลด้วยตนเองหน้างานแล้ว ไม่ต้องกรอกเบอร์โทร/ที่อยู่เพิ่ม
+                socket.emit('submit-winner-collected');
+            } else if (result.isDenied) {
+                openRewardAddressModal();
+            }
+            // กด "ไว้เลือกทีหลัง" หรือปิดหน้าต่าง -> ปุ่มลอย "🎁 รับรางวัล" จะยังค้างให้กดใหม่ได้ทีหลัง
+        });
+    }
+
+    // ฟังก์ชันเปิด Modal กรอกที่อยู่รับของรางวัล (แบบ B)
+    function openRewardAddressModal() {
+        Swal.fire({
+            title: '📦 ข้อมูลจัดส่งรางวัล',
             text: 'กรุณากรอกข้อมูลที่อยู่สำหรับจัดส่งของรางวัล:',
             html:
                 '<input id="swal-phone" class="swal2-input" placeholder="เบอร์โทรศัพท์ติดต่อ">' +
@@ -1285,11 +1316,17 @@
         });
     }
 
-    // เซิร์ฟเวอร์ยืนยันว่าบันทึกที่อยู่สำเร็จแล้ว -> ปิดปุ่มลอย และปลดล็อกให้ game-reset รีโหลดหน้าได้ตามปกติ
-    socket.on('winner-info-saved', () => {
+    // เซิร์ฟเวอร์ยืนยันว่าบันทึกข้อมูลผู้ชนะสำเร็จแล้ว -> ปิดปุ่มลอย และปลดล็อกให้ game-reset รีโหลดหน้าได้ตามปกติ
+    // [ส่วนแก้ไข] เดิมขึ้นข้อความ "จะทำการจัดส่งของรางวัลให้ท่าน" ตายตัวทุกกรณี ทั้งที่บางคนเลือก "รับรางวัลแล้ว" ด้วยตนเองไปแล้ว ไม่มีอะไรต้องจัดส่งอีก
+    socket.on('winner-info-saved', (data) => {
         hasPendingReward = false;
         document.getElementById('btn-floating-reward').classList.add('hidden');
-        Swal.fire({ icon: 'success', title: 'บันทึกข้อมูลเรียบร้อย!', text: 'ทางสภาวิชาชีพฯ จะทำการจัดส่งของรางวัลให้ท่านครับ' });
+        const isPickup = data && data.collectionMethod === 'pickup';
+        Swal.fire({
+            icon: 'success',
+            title: isPickup ? 'ขอบคุณครับ! 🎉' : 'บันทึกข้อมูลเรียบร้อย!',
+            text: isPickup ? 'บันทึกแล้วว่าคุณได้รับรางวัลด้วยตนเองเรียบร้อย' : 'ทางสภาวิชาชีพฯ จะทำการจัดส่งของรางวัลให้ท่านครับ'
+        });
     });
 
     // [ส่วนปรับแก้] หน้าจอกลางเมื่อมีคน BINGO ให้ขึ้น Banner ลอยแล้วหายไปเอง 5 วินาที
@@ -1313,7 +1350,7 @@
             Swal.fire({
                 icon: 'success',
                 title: '🎉 มีผู้ BINGO แล้ว!',
-                html: `<b style="font-size: 24px; color: #10b981;">${data.name}</b><br><span style="color: #cbd5e1;">หน่วยงาน: ${data.org} (การ์ดใบที่ ${data.cardId})</span>`,
+                html: `<b style="font-size: 24px; color: #059669;">${data.name}</b><br><span style="color: #475569;">หน่วยงาน: ${data.org} (การ์ดใบที่ ${data.cardId})</span>`,
                 confirmButtonColor: '#10b981',
                 confirmButtonText: 'ยินดีด้วย! 👏'
             });
@@ -1338,11 +1375,11 @@
             return;
         }
 
-        // สำคัญที่สุด: ถ้ายังกรอกที่อยู่รับรางวัลไม่เสร็จ ห้ามรีโหลดหน้าทิ้งเด็ดขาด ต้องกรอกต่อได้เสมอ
+        // สำคัญที่สุด: ถ้ายังไม่ได้กดรับรางวัล ห้ามรีโหลดหน้าทิ้งเด็ดขาด ต้องกดรับรางวัลต่อได้เสมอ
         if (hasPendingReward) {
             gameIsStarted = false;
             roundNumber = data?.roundNumber || roundNumber;
-            Swal.fire({ icon: 'info', title: 'แอดมินเปิดรอบใหม่แล้ว', text: 'ท่านยังกรอกที่อยู่รับรางวัลของท่านได้ตามปกติครับ (กดปุ่ม 🎁 มุมขวาบน)', timer: 2500, showConfirmButton: false });
+            Swal.fire({ icon: 'info', title: 'แอดมินเปิดรอบใหม่แล้ว', text: 'ท่านยังรับรางวัลของท่านได้ตามปกติครับ (กดปุ่ม 🎁 มุมขวาบน)', timer: 2500, showConfirmButton: false });
             return;
         }
 

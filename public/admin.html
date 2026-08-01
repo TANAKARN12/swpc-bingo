@@ -908,9 +908,11 @@
                 <td class="p-3.5"><span class="bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 text-xs font-bold text-amber-400">ใบที่ ${w.cardId}</span></td>
                 <td class="p-3.5 font-bold text-amber-300">${w.phone || '-'}</td>
                 <td class="p-3.5 text-xs text-slate-200">${w.address || '-'}</td>
-                <td class="p-3.5">${w.addressComplete
-                    ? '<span class="bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 px-2.5 py-1 rounded-full text-[11px] font-bold">✅ ครบแล้ว</span>'
-                    : '<span class="bg-amber-500/15 text-amber-400 border border-amber-500/40 px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse">⏳ รอกรอกที่อยู่</span>'}</td>
+                <td class="p-3.5">${w.collectionMethod === 'pickup'
+                    ? '<span class="bg-cyan-500/15 text-cyan-400 border border-cyan-500/40 px-2.5 py-1 rounded-full text-[11px] font-bold">🤝 รับด้วยตนเองแล้ว</span>'
+                    : (w.addressComplete
+                        ? '<span class="bg-emerald-500/15 text-emerald-400 border border-emerald-500/40 px-2.5 py-1 rounded-full text-[11px] font-bold">✅ ครบแล้ว</span>'
+                        : '<span class="bg-amber-500/15 text-amber-400 border border-amber-500/40 px-2.5 py-1 rounded-full text-[11px] font-bold animate-pulse">⏳ รอกรอกที่อยู่</span>')}</td>
             </tr>
         `).join('');
     }
@@ -1082,7 +1084,7 @@
         Swal.fire({
             icon: 'success',
             title: '🎉 มีผู้บิงโกแล้ว!',
-            html: `<b style="font-size: 22px; color: #10b981;">${data.name}</b><br><span style="color: #cbd5e1;">หน่วยงาน: ${data.org} (การ์ดใบที่ ${data.cardId})</span>`,
+            html: `<b style="font-size: 22px; color: #059669;">${data.name}</b><br><span style="color: #475569;">หน่วยงาน: ${data.org} (การ์ดใบที่ ${data.cardId})</span>`,
             confirmButtonColor: '#10b981',
             confirmButtonText: 'รับทราบ 👍'
         });
