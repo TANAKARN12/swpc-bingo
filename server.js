@@ -35,10 +35,16 @@ const AVATARS = [
     '🦥', '🦦', '🦘', '🦡', '🦩', '🦚'
 ];
 
+// จำนวนผู้เล่นสูงสุดต่อรอบ (= จำนวนการ์ดที่สร้างไว้ล่วงหน้า) ปรับได้สดๆ จากหน้าแอดมิน (ดู admin-set-max-players)
+// ค่าเริ่มต้นปรับจาก 30 -> 100 ตามคำขอ และอนุญาตให้แอดมินตั้งได้สูงสุด 300 คน/รอบ
+const DEFAULT_MAX_PLAYERS = 100;
+const MAX_PLAYERS_LIMIT = 300;
+
 let gameState = {
     isGameStarted: false,
     roundNumber: 1, // เพิ่มทุกครั้งที่แอดมินกด Reset หรือเปิดรอบใหม่
     boardSize: 5, // ค่าเริ่มต้นของระบบคือ 5x5 (3/4/5/6 ปรับได้จากหน้าแอดมิน)
+    maxPlayers: DEFAULT_MAX_PLAYERS, // จำนวนผู้เล่น/การ์ดสูงสุดต่อรอบ ปรับได้จากหน้าแอดมิน
     wordList: [...DEFAULT_WORD_LIST],
     drawnWords: [],
     players: {}, // socket.id -> player object (เฉพาะผู้เล่นที่ "ออนไลน์อยู่ตอนนี้" เท่านั้น)
@@ -116,7 +122,7 @@ function generateBingoCard(size) {
     return card;
 }
 
-// ฟังก์ชันเริ่มต้นการ์ดบิงโก 30 ใบ ตามขนาดกระดานปัจจุบัน
+// ฟังก์ชันเริ่มต้นชุดการ์ดบิงโก ตามจำนวน gameState.maxPlayers และขนาดกระดานปัจจุบัน
 // คืนค่า true ถ้าสร้างสำเร็จ, false ถ้าคำศัพท์ในระบบไม่พอสำหรับขนาดกระดานที่เลือก
 function initializeCards() {
     const required = requiredWordsForSize(gameState.boardSize);
@@ -124,7 +130,7 @@ function initializeCards() {
         return false;
     }
     gameState.availableCards = [];
-    for (let i = 1; i <= 30; i++) {
+    for (let i = 1; i <= gameState.maxPlayers; i++) {
         gameState.availableCards.push({
             id: i,
             card: generateBingoCard(gameState.boardSize),
@@ -207,7 +213,7 @@ function countNearBingoPlayers() {
 // wipeRoster = false -> "รอบใหม่ (คงผู้เล่นเดิม)": สับไพ่ใหม่ทั้งชุด แล้วแจกการ์ดอัตโนมัติให้ 2 กลุ่มโดยไม่ต้องกรอกฟอร์มซ้ำ
 //   (1) ผู้เล่นเดิมในรอบก่อนที่ยังออนไลน์อยู่ตอนนี้ (สิทธิ์ก่อน)
 //   (2) ผู้ที่กำลังรอคิวอยู่ (join-waiting-room) เรียงตามลำดับที่เข้าคิว
-//   รวมกันได้สูงสุด 30 คน/รอบ (เท่าจำนวนการ์ดที่มี) ถ้าเกินโควตา คนที่เหลือจะถูกเก็บไว้ในคิวรอรอบถัดไปต่อไปอัตโนมัติ
+//   รวมกันได้สูงสุดเท่า gameState.maxPlayers คน/รอบ (เท่าจำนวนการ์ดที่มี) ถ้าเกินโควตา คนที่เหลือจะถูกเก็บไว้ในคิวรอรอบถัดไปต่อไปอัตโนมัติ
 function startNewRound({ wipeRoster }) {
     // ยกเลิกการนับถอยหลังที่ค้างอยู่ (ถ้ามี) กันเคสแอดมิน Reset ระหว่างที่กำลังนับถอยหลัง "เรดี้...โก!" อยู่พอดี
     if (gameState.countdownTimeout) {
@@ -287,7 +293,7 @@ function startNewRound({ wipeRoster }) {
         Object.entries(gameState.waitingPlayers).forEach(([socketId, info]) => overflow.push({ socketId, info }));
     }
 
-    // คนที่การ์ดไม่พอ (เกินโควตา 30 ใบ) หรือกรณีคำศัพท์ไม่พอ ให้กลับไปอยู่ในคิวรอรอบถัดไปต่อ ไม่ตกหล่นหายไปไหน
+    // คนที่การ์ดไม่พอ (เกินโควตา maxPlayers) หรือกรณีคำศัพท์ไม่พอ ให้กลับไปอยู่ในคิวรอรอบถัดไปต่อ ไม่ตกหล่นหายไปไหน
     overflow.forEach(({ socketId, info }) => { newWaitingPlayers[socketId] = info; });
 
     gameState.players = newPlayers;
@@ -317,6 +323,7 @@ io.on('connection', (socket) => {
         roundNumber: gameState.roundNumber,
         waitingCount: Object.keys(gameState.waitingPlayers).length,
         boardSize: gameState.boardSize,
+        maxPlayers: gameState.maxPlayers,
         drawnWords: gameState.drawnWords,
         wordList: gameState.wordList,
         winners: gameState.winners,
@@ -512,6 +519,40 @@ io.on('connection', (socket) => {
         }
     });
 
+    // แอดมินปรับจำนวนผู้เล่น/การ์ดสูงสุดต่อรอบ (ค่าเริ่มต้น 100 คน ปรับได้สูงสุด 300 คน)
+    // หมายเหตุ: เหมือน admin-set-board-size คือจะสร้างชุดการ์ดใหม่ทั้งหมด จึงล้างเฉพาะ "การ์ดที่ถืออยู่" ของทุกคน
+    // แต่ไม่ล้างชื่อ/องค์กร/avatar/token (roster ยังอยู่) ผู้เล่นแค่ต้องเลือกการ์ดใหม่อีกครั้ง
+    socket.on('admin-set-max-players', (value) => {
+        let n = parseInt(value, 10);
+        if (!Number.isFinite(n)) return;
+        n = Math.max(10, Math.min(MAX_PLAYERS_LIMIT, n));
+
+        gameState.maxPlayers = n;
+        gameState.players = {};
+        gameState.isGameStarted = false;
+        if (gameState.countdownTimeout) { clearTimeout(gameState.countdownTimeout); gameState.countdownTimeout = null; }
+        gameState.countdownActive = false;
+
+        Object.keys(gameState.playersByToken).forEach((token) => {
+            gameState.playersByToken[token] = { ...gameState.playersByToken[token], card: null, cardId: null };
+        });
+
+        const ok = initializeCards();
+
+        io.emit('max-players-updated', {
+            maxPlayers: gameState.maxPlayers,
+            boardSize: gameState.boardSize,
+            cards: gameState.availableCards,
+            isGameStarted: false
+        });
+        io.emit('player-list-updated', []);
+        broadcastRoster();
+
+        if (!ok) {
+            socket.emit('word-op-error', `คำศัพท์ในระบบไม่พอสำหรับโหมด ${gameState.boardSize}x${gameState.boardSize} กรุณาเพิ่มคำศัพท์ก่อน`);
+        }
+    });
+
     // แอดมินเพิ่มคำศัพท์ใหม่เข้ารายการกลาง (Real-time CRUD)
     socket.on('admin-add-word', (word) => {
         word = (word || '').toString().trim();
@@ -688,7 +729,7 @@ io.on('connection', (socket) => {
 
     // แอดมินสั่งเปิด "รอบใหม่ (คงผู้เล่นเดิม)" = สับไพ่ใหม่ทั้งชุด แต่ไม่ล้าง roster
     // รับทั้งผู้เล่นเดิมที่ยังออนไลน์อยู่ และผู้ที่กำลังรอคิวอยู่ (คนมาสายระหว่างรอบก่อน) เข้าเล่นพร้อมกันทันที
-    // ไม่ต้องมีใครกรอกฟอร์มซ้ำเลย รวมกันได้สูงสุด 30 คน/รอบ (เท่าจำนวนการ์ด) ถ้าเกินโควตาจะเก็บคนที่เหลือไว้รอรอบถัดไปอัตโนมัติ
+    // ไม่ต้องมีใครกรอกฟอร์มซ้ำเลย รวมกันได้สูงสุดเท่า gameState.maxPlayers คน/รอบ (เท่าจำนวนการ์ด) ถ้าเกินโควตาจะเก็บคนที่เหลือไว้รอรอบถัดไปอัตโนมัติ
     socket.on('admin-new-round-keep-players', () => {
         const { admitted, overflow, ok } = startNewRound({ wipeRoster: false });
 
@@ -706,7 +747,7 @@ io.on('connection', (socket) => {
             io.to(p.id).emit('your-new-card', { card: p.card, cardId: p.cardId, roundNumber: gameState.roundNumber });
         });
 
-        // คนที่การ์ดไม่พอ (เกินโควตา 30 ใบ) แจ้งให้ทราบว่ายังอยู่ในคิว รอรอบถัดไปให้อัตโนมัติ
+        // คนที่การ์ดไม่พอ (เกินโควตา maxPlayers) แจ้งให้ทราบว่ายังอยู่ในคิว รอรอบถัดไปให้อัตโนมัติ
         overflow.forEach(({ socketId }) => {
             io.to(socketId).emit('registration-blocked', {
                 message: `ขออภัยครับ รอบนี้เต็มแล้ว (สูงสุด ${gameState.availableCards.length} ใบ/รอบ) กรุณารอรอบถัดไป`,
