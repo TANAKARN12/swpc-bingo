@@ -421,6 +421,21 @@
     function unlockAudio() {
         if (audioCtx.state === 'suspended') audioCtx.resume();
         unlockApplauseAudioFiles(); // [ส่วนเพิ่ม] ปลดล็อกไฟล์เสียงปรบมือจริงพร้อมกันในจังหวะ user gesture เดียวกัน
+        unlockSpeechSynthesis(); // [ส่วนเพิ่ม] แก้บั๊กจริง: เสียงอ่านคำไม่ตอบสนองเลย ปลดล็อก speechSynthesis ด้วยหลักการเดียวกัน
+    }
+
+    // [ส่วนเพิ่ม] แก้บั๊กจริง: "เสียงอ่านคำภาษาไทย ไม่มีการตอบสนองเลยทั้งฝั่งผู้เล่น/แอดมิน/จอกลาง"
+    // สาเหตุหลักเหมือนกับที่เจอกับไฟล์เสียงปรบมือมาก่อนหน้านี้ทุกประการ: speechSynthesis.speak() ที่ถูกสั่งจาก socket event (ไม่ใช่การแตะหน้าจอโดยตรง)
+    // จะถูกเบราว์เซอร์หลายตัวเงียบเสียงทิ้งไปเลย ถ้าไม่เคยมีการเรียก speak() จาก user gesture จริงๆ มาก่อนสักครั้งบนหน้านั้น
+    // แก้โดยพูดประโยคเปล่า (volume 0) ทันทีตอนผู้เล่นแตะหน้าจอครั้งแรกจริงๆ เป็นการ "ปลดล็อก" ไว้ล่วงหน้า
+    function unlockSpeechSynthesis() {
+        if (!('speechSynthesis' in window)) return;
+        try {
+            const warm = new SpeechSynthesisUtterance(' ');
+            warm.volume = 0;
+            warm.lang = 'th-TH';
+            window.speechSynthesis.speak(warm);
+        } catch (e) { /* เงียบไว้ */ }
     }
     document.addEventListener('click', function onceUnlock() {
         unlockAudio();
@@ -752,6 +767,15 @@
 
     socket.on('trigger-sfx', (type) => playSynthSfx(type));
 
+    // [ส่วนเพิ่ม] แอดมินกดหยุดเสียง เอฟเฟกต์ที่กำลังเล่นอยู่จะหยุดทันทีที่ทุกจอ (รับมือกรณีไฟล์เสียงจริงยาวเกินไป)
+    function stopAllSfx() {
+        Object.values(_applauseAudioCache || {}).forEach((a) => {
+            try { a.pause(); a.currentTime = 0; } catch (e) { /* เงียบไว้ */ }
+        });
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel(); // หยุดเสียงอ่านคำที่ค้างอยู่ด้วยเช่นกัน
+    }
+    socket.on('stop-sfx', stopAllSfx);
+
     document.getElementById('form-register').addEventListener('submit', (e) => {
         e.preventDefault();
         unlockAudio(); // user gesture จริง -> ปลดล็อกเสียงตรงนี้เลย
@@ -1013,6 +1037,32 @@
         renderBingoBoard();
     });
 
+    // [ส่วนเพิ่ม] แก้บั๊กจริงจากภาพตัวอย่าง: "คุ้มครองสิทธิ" ถูกตัดเป็น "คุ้มครองสิท" / "ธิ" (เหลือตัวอักษรเดียวโดดๆ บรรทัด 2)
+    // สาเหตุ: การพึ่ง CSS word-break:normal + lang="th" ให้เบราว์เซอร์ตัดคำเองตามหลักภาษาไทย ใช้ได้ไม่แน่นอน บางเบราว์เซอร์/บางอุปกรณ์
+    // (โดยเฉพาะ Samsung Internet / Chrome บน Android บางรุ่น) ไม่รองรับการตัดคำภาษาไทยแบบพจนานุกรมในส่วนของการ "ตัดบรรทัด" เลย
+    // จึงตัดมั่วตามความกว้างล้วนๆ ไม่สนใจว่าจะแหว่งคำหรือไม่
+    //
+    // แก้โดยใช้ Intl.Segmenter (มาตรฐาน JS ในตัวเบราว์เซอร์ ไม่ต้องพึ่งอินเทอร์เน็ต/พจนานุกรมภายนอก) ซึ่งเป็นคนละระบบจาก CSS line-breaking
+    // และรองรับการตัดคำภาษาไทยแม่นยำกว่ามากเพราะเบราว์เซอร์ตระกูล Chromium (Samsung Internet, Chrome Android ก็อยู่ในตระกูลนี้) ฝัง ICU มาเต็มในตัวเอง
+    // ตัดคำล่วงหน้าเป็นคำๆ ตามหลักภาษาไทยจริง แล้วแทรกช่องว่างกว้างศูนย์ (zero-width space) คั่นระหว่างคำ เป็น "จุดที่อนุญาตให้ตัดบรรทัดได้" เท่านั้น
+    // (ไม่แสดงผลเป็นช่องว่างจริงบนหน้าจอ) เบราว์เซอร์จะตัดบรรทัดแค่ตรงรอยต่อคำที่ถูกต้องเท่านั้น ไม่มีวันแหว่งกลางคำอีก
+    let thaiWordSegmenter = null;
+    try {
+        if (typeof Intl !== 'undefined' && typeof Intl.Segmenter === 'function') {
+            thaiWordSegmenter = new Intl.Segmenter('th', { granularity: 'word' });
+        }
+    } catch (e) { thaiWordSegmenter = null; }
+
+    function insertThaiBreakOpportunities(text) {
+        if (!thaiWordSegmenter || !text) return text;
+        try {
+            const segments = Array.from(thaiWordSegmenter.segment(text), s => s.segment);
+            return segments.join('\u200B');
+        } catch (e) {
+            return text; // เบราว์เซอร์รุ่นเก่าที่ไม่รองรับ Intl.Segmenter -> ใช้ข้อความเดิม (ยังมีระบบสำรอง break-word/break-all คอยรับอยู่แล้ว)
+        }
+    }
+
     // [ส่วนแก้ไข] ออกแบบอัลกอริทึมใหม่ทั้งหมด แก้ปัญหาเดิมที่ยังไม่จบสักที: "ตัวหนังสือเล็กลงทั้งกระดาน" เพราะวิธีเดิมบังคับให้
     // ทุกช่อง "ต้องพอดีพร้อมกัน" ในไซซ์เดียว ถ้ามีคำยากอยู่ไม่กี่ช่อง (เช่น "นักสังคมสงเคราะห์") จะลากทั้งกระดานเล็กลงตามไปด้วยเสมอ
     //
@@ -1145,7 +1195,7 @@
                     cell.tabIndex = -1;
                     cell.setAttribute('aria-disabled', 'true');
                 } else {
-                    cell.innerText = val;
+                    cell.innerText = insertThaiBreakOpportunities(val); // [ส่วนแก้ไข] แทรกจุดตัดบรรทัดตามคำจริงๆ (ดู insertThaiBreakOpportunities ด้านบน) กันคำแหว่งกลาง
                     textCells.push(cell);
                 }
 
@@ -1296,6 +1346,7 @@
     function speakThai(text) {
         if (!('speechSynthesis' in window)) return;
         window.speechSynthesis.cancel();
+        window.speechSynthesis.resume(); // [ส่วนเพิ่ม] กันบั๊กที่รู้จักกันดีของ Chrome/Android บางรุ่น ที่ speechSynthesis ค้างอยู่ในสถานะ paused หลังไม่ได้ใช้งานสักพัก ทำให้ speak() ครั้งถัดไปเงียบไปเลย
         // ตัดจุดแบบคำย่อออก (เช่น "พ.ร.บ." หรือ "สค.ร.") เพราะเอนจิ้นเสียงหลายตัวจะอ่านจุดเป็นคำว่า "จุด" แทรกกลางคำ ฟังไม่เป็นธรรมชาติ
         const cleanText = text.replace(/\./g, ' ').replace(/\s+/g, ' ').trim();
         const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -1304,7 +1355,10 @@
         utterance.pitch = 1;
         const voice = cachedThaiVoice || pickThaiVoice();
         if (voice) utterance.voice = voice; // ระบุเสียงไทยที่หาได้ชัดเจน แทนปล่อยให้เบราว์เซอร์เดาเอง
-        window.speechSynthesis.speak(utterance);
+        // [ส่วนเพิ่ม] หน่วงเรียก speak() ข้ามรอบ event loop นิดเดียว กัน cancel()+speak() ชนกันเองจนเงียบ (บั๊กที่รู้จักกันดีในบางเบราว์เซอร์)
+        setTimeout(() => {
+            try { window.speechSynthesis.speak(utterance); } catch (e) { /* เงียบไว้ */ }
+        }, 30);
     }
 
     function claimBingo() {
