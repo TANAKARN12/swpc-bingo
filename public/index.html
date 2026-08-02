@@ -1013,50 +1013,61 @@
         renderBingoBoard();
     });
 
-    // [ส่วนแก้ไข] เดิมคำนวณขนาดฟอนต์แยกทีละช่องตามความยาวคำ ทำให้แต่ละช่องมีขนาดตัวอักษรไม่เท่ากัน ดูไม่เป็นระเบียบ
-    // ตอนนี้เปลี่ยนเป็น "ขนาดเดียวกันทั้งกระดาน" โดยอนุญาตให้คำยาวๆ ขึ้นบรรทัดใหม่ได้ (สูงสุด ~3 บรรทัด) แทนการลดฟอนต์จนเล็กจิ๋วช่องเดียว
-    // หาไซซ์ที่ใหญ่ที่สุดที่ทำให้ "ทุกช่อง" พอดีกรอบพร้อมกัน แล้วใช้ไซซ์เดียวกันนั้นกับทุกช่องในกระดาน
+    // [ส่วนแก้ไข] ออกแบบอัลกอริทึมใหม่ทั้งหมด แก้ปัญหาเดิมที่ยังไม่จบสักที: "ตัวหนังสือเล็กลงทั้งกระดาน" เพราะวิธีเดิมบังคับให้
+    // ทุกช่อง "ต้องพอดีพร้อมกัน" ในไซซ์เดียว ถ้ามีคำยากอยู่ไม่กี่ช่อง (เช่น "นักสังคมสงเคราะห์") จะลากทั้งกระดานเล็กลงตามไปด้วยเสมอ
+    //
+    // วิธีใหม่ (แม่นยำและฉลาดกว่า):
+    // 1) วัด "ไซซ์ที่ใหญ่ที่สุดที่ช่องนั้นพอดีด้วยตัวเอง" แยกเป็นรายช่อง ด้วยวิธี binary search (เร็วและแม่นยำกว่าการลดทีละ 0.5px ไล่ทั้งกระดาน)
+    // 2) เรียงไซซ์ที่ได้จากน้อยไปมาก แล้วเลือก "ไซซ์ของทั้งกระดาน" จากเปอร์เซ็นไทล์ที่ 20 (ให้ 80% ของช่องได้ไซซ์นี้แบบสบายๆ ไม่ต้องบีบ)
+    //    คำยากส่วนน้อย (~20%) ที่เหลือ จะไปรับการจัดการเฉพาะช่อง (ตัดคำได้ทุกตัวอักษร + ลดขนาดแค่ช่องนั้น) แทนการลากทั้งบอร์ดลงไปด้วย
+    // ผลลัพธ์: กระดานส่วนใหญ่ได้ตัวอักษรใหญ่สุดเท่าที่จะเป็นไปได้จริงๆ ไม่ถูกลากลงเพราะคำยากไม่กี่คำอีกต่อไป
     function fitBoardTextUniformly(textCells, size) {
         if (!textCells.length) return;
-        const baseBySize = { 3: 24, 4: 21, 5: 19, 6: 16 };
-        let fontSize = baseBySize[size] || baseBySize[3];
-        // [ส่วนแก้ไข] แก้บั๊กจริง: เดิม minFontSize=11 ทำให้ถ้ามีแค่ "1 ช่อง" ที่มีคำยาวมากๆ (เช่น "นักสังคมสงเคราะห์")
-        // ทั้งกระดานจะถูกบีบลงมาที่ 11px เท่ากันหมดทุกช่อง ทั้งที่อีก 24 ช่องมีพื้นที่พอจะใหญ่กว่านั้นมาก ทำให้ทั้งบอร์ดดูเล็กลงทั้งที่ไม่จำเป็น
-        // แก้โดยเพิ่ม floor ของรอบ "ทั้งกระดาน" เป็น 15px (ให้ส่วนใหญ่ยังคงใหญ่อ่านง่าย) แล้วปล่อยให้ช่องที่ยังล้นอยู่จริงๆ
-        // ไปรับการแก้แบบเฉพาะช่อง (ลดขนาดแค่ช่องนั้นช่องเดียว) ในขั้นตอนถัดไปด้านล่างแทน ไม่ต้องลากทั้งกระดานลงไปด้วย
-        const minFontSize = 15;
-        let guard = 0;
+        const ceilBySize = { 3: 26, 4: 23, 5: 21, 6: 18 };
+        const absoluteMax = ceilBySize[size] || ceilBySize[3];
+        const absoluteMin = 10; // ไซซ์ต่ำสุดที่ยัง "ยอมรับได้" สำหรับไซซ์รวมของทั้งกระดาน (คำยากพิเศษไปรับ hardFloor ที่ต่ำกว่านี้ได้อีกทีด้านล่าง)
 
-        // [ส่วนแก้ไข] แก้บั๊กจริง: เดิมวัด overflow ขณะตัวหนังสือจัดกึ่งกลางแนวตั้ง-แนวนอนอยู่ (items-center/justify-center)
-        // เบราว์เซอร์บางตัว โดยเฉพาะ Safari/iOS วัด scrollHeight/scrollWidth ของเนื้อหาที่จัดกึ่งกลางได้ไม่แม่นยำ
-        // (เนื้อหาล้นออกทั้งสองด้านเท่าๆ กัน ทำให้ scrollHeight รายงานค่าน้อยกว่าที่ล้นจริง ระบบเลยเข้าใจผิดว่า "พอดีแล้ว" ทั้งที่จริงล้นขอบอยู่)
-        // แก้โดยชั่วคราวจัดชิดบน-ชิดซ้ายระหว่างวัดขนาด (วัดแม่นยำกว่ามาก) แล้วค่อยจัดกึ่งกลางกลับหลังหาไซซ์ที่พอดีแล้ว
+        // [คงไว้] แก้บั๊กจริงเรื่องการวัด overflow ขณะจัดกึ่งกลาง (Safari/iOS วัดไม่แม่นยำ) ด้วยการจัดชิดบน-ชิดซ้ายชั่วคราวระหว่างวัด
         textCells.forEach(c => { c.style.alignItems = 'flex-start'; c.style.justifyContent = 'flex-start'; });
 
-        while (guard < 40) {
-            textCells.forEach(c => { c.style.fontSize = fontSize + 'px'; });
-            let overflow = false;
-            for (const c of textCells) {
-                if (c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1) { overflow = true; break; }
-            }
-            if (!overflow || fontSize <= minFontSize) break;
-            fontSize -= 0.5;
-            guard++;
+        function isOverflowing(c) {
+            return c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1;
         }
 
-        // [ส่วนเพิ่ม] แก้บั๊กจากรูปตัวอย่างที่แนบมา: คำประสมยาวๆ ที่ไม่มีจุดตัดคำตามหลักภาษาไทยเลย (เช่น "นักสังคมสงเคราะห์")
-        // เบราว์เซอร์เข้าใจว่าเป็น "คำเดียว" ห้ามตัดกลางคำ (word-break:normal) ทำให้ต่อให้ลดฟอนต์จนถึงขั้นต่ำสุดของทั้งกระดานแล้วก็ยังกว้างเกินกรอบอยู่ดี
-        // ผลคือ text-align:center ทำให้ล้นออกทั้ง 2 ฝั่งเท่าๆ กัน แล้วโดน overflow-hidden ตัดตัวอักษรแรก/ตัวท้ายขาดหายไป (คำว่า "สังคมสงเคราะห์" เห็นแค่ "ังคมสงเคราะห์")
-        // แก้โดยเช็คเฉพาะช่องที่ยังล้นอยู่หลังลดฟอนต์จนสุดแล้ว (เคสพิเศษน้อยช่องมาก) ให้บังคับตัดคำได้ทุกตัวอักษรเป็นทางเลือกสุดท้ายจริงๆ
-        // และยอมให้ช่องนั้นเล็กกว่ามาตรฐานทั้งกระดานได้อีกนิด ดีกว่าปล่อยให้ตัวอักษรขาดหายไปแบบในบั๊กนี้
+        // หาไซซ์ใหญ่สุดที่ "ช่องนี้ช่องเดียว" พอดีกรอบตัวเอง ด้วย binary search (เทียบกับไล่ทีละ 0.5px ทั้งกระดานแบบเดิม เร็วกว่ามากและแม่นยำกว่าด้วย)
+        function findBestFitForCell(c) {
+            c.style.fontSize = absoluteMin + 'px';
+            if (isOverflowing(c)) return absoluteMin; // คำยากสุดๆ แม้ไซซ์ต่ำสุดก็ยังไม่พอ ปล่อยให้ขั้นตอนถัดไปจัดการเป็นพิเศษ
+            let lo = absoluteMin, hi = absoluteMax, best = absoluteMin;
+            let guard = 0;
+            while (hi - lo > 0.5 && guard < 12) {
+                const mid = (lo + hi) / 2;
+                c.style.fontSize = mid + 'px';
+                if (isOverflowing(c)) { hi = mid; } else { lo = mid; best = mid; }
+                guard++;
+            }
+            return best;
+        }
+
+        const perCellBest = textCells.map(findBestFitForCell);
+
+        // เลือกไซซ์ของทั้งกระดานจากเปอร์เซ็นไทล์ที่ 20 ของช่องทั้งหมด (ตัดผลกระทบจากคำยากส่วนน้อยออกไป)
+        const sorted = [...perCellBest].sort((a, b) => a - b);
+        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.2));
+        let uniformSize = Math.floor(sorted[percentileIdx] * 2) / 2; // ปัดลงทีละ 0.5px กันคลาดเคลื่อนจากการปัดเศษ
+
+        textCells.forEach(c => { c.style.fontSize = uniformSize + 'px'; });
+
+        // [คงไว้] คำประสมยาวๆ ที่ไม่มีจุดตัดตามหลักภาษาไทยเลย (เช่น "นักสังคมสงเคราะห์") อาจยังล้นอยู่แม้ที่ไซซ์รวมแล้ว
+        // ให้จัดการเฉพาะช่องนั้น: ยอมตัดคำได้ทุกตัวอักษรเป็นทางเลือกสุดท้ายจริงๆ พร้อมลดขนาดเฉพาะช่องนั้นต่อจนพอดี ไม่กระทบช่องอื่น
         textCells.forEach(c => {
-            if (c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1) {
+            if (isOverflowing(c)) {
                 c.style.wordBreak = 'break-all';
                 c.style.overflowWrap = 'anywhere';
-                let soloSize = parseFloat(c.style.fontSize) || fontSize;
-                const hardFloor = 8; // ต่ำสุดจริงๆ เฉพาะเคสพิเศษนี้เท่านั้น (ทั้งกระดานยังคงใช้ minFontSize=15 ตามปกติ)
+                let soloSize = uniformSize;
+                const hardFloor = 8;
                 let g2 = 0;
-                while ((c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1) && soloSize > hardFloor && g2 < 30) {
+                while (isOverflowing(c) && soloSize > hardFloor && g2 < 30) {
                     soloSize -= 0.5;
                     c.style.fontSize = soloSize + 'px';
                     g2++;
@@ -1100,7 +1111,7 @@
                 const cell = document.createElement('button');
                 boardCells[r][c] = cell; // [ส่วนเพิ่ม] เก็บ reference ไว้หาแนวที่บิงโกได้ทีหลัง
                 const isFree = val === "FREE";
-                // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด minFontSize แล้วยังไม่พอดี
+                // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด hardFloor แล้วยังไม่พอดี
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
                 cell.className = `w-full h-full font-extrabold p-1.5 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
                 if (!isFree) {
@@ -1112,8 +1123,8 @@
                 // เปลี่ยนเป็น word-break:normal (ให้เบราว์เซอร์ตัดคำตามพจนานุกรมไทยผ่าน lang="th" ที่ตั้งไว้ที่ <html> ก่อน) และใช้ break-word เป็นทางเลือกสำรองสุดท้ายเท่านั้น
                 cell.style.wordBreak = 'normal';
                 cell.style.overflowWrap = 'break-word';
-                // [ส่วนแก้ไข] เพิ่มระยะห่างบรรทัดจาก 1.15 เป็น 1.5 กันสระบน-ล่าง/วรรณยุกต์ไทยชิดหรือทับกับบรรทัดถัดไปตอนคำยาวขึ้นหลายบรรทัด
-                cell.style.lineHeight = '1.5';
+                // [ส่วนแก้ไข] ปรับจาก 1.5 ลงมาเป็น 1.4 (ยังเผื่อพื้นที่ให้สระบน-ล่าง/วรรณยุกต์ไทยพอเพียง แต่คืนพื้นที่แนวตั้งบางส่วนให้ตัวอักษรใหญ่ขึ้นได้)
+                cell.style.lineHeight = '1.4';
 
                 // [ส่วนเพิ่ม] ช่อง FREE เปลี่ยนจากตัวหนังสือ "FREE" เป็นโลโก้สภาวิชาชีพฯ แทน
                 // วิธีติดตั้ง: นำไฟล์โลโก้ (พื้นหลังโปร่งใสจะสวยที่สุด) วางไว้ที่ public/images/council-logo.png ของโปรเจกต์
