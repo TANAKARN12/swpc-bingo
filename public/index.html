@@ -332,6 +332,7 @@
     let drawnHistory = [];
     let isViewerMode = false;
     let boardSize = 3; // ค่าเริ่มต้น จะถูกอัปเดตจากเซิร์ฟเวอร์เสมอ
+    let boardLocked = false; // [ส่วนเพิ่ม] ล็อกกระดานหลัง BINGO สำเร็จ กันกดติ๊ก/ถอนติ๊กช่องอื่นเปลี่ยนแปลงต่อ (ใช้เป็นหลักฐานอ้างอิงว่าบิงโกแนวไหนได้)
     let gameIsStarted = false;
     let roundNumber = 1;
     let waitingCount = 0;
@@ -1017,11 +1018,13 @@
     // หาไซซ์ที่ใหญ่ที่สุดที่ทำให้ "ทุกช่อง" พอดีกรอบพร้อมกัน แล้วใช้ไซซ์เดียวกันนั้นกับทุกช่องในกระดาน
     function fitBoardTextUniformly(textCells, size) {
         if (!textCells.length) return;
-        const baseBySize = { 3: 22, 4: 19, 5: 17, 6: 14 };
+        const baseBySize = { 3: 24, 4: 21, 5: 19, 6: 16 };
         let fontSize = baseBySize[size] || baseBySize[3];
-        // [ส่วนแก้ไข] เพิ่มขนาดฟอนต์ต่ำสุดจาก 7.5 เป็น 11px กันตัวเล็กจนผู้สูงอายุอ่านไม่ออก
-        // (ถ้าคำยาวมากจนต่ำกว่านี้ยังไม่พอดี ยอมให้ล้นเล็กน้อยแต่ถูกตัดด้วย overflow-hidden ดีกว่าอ่านไม่ออกเลย)
-        const minFontSize = 11;
+        // [ส่วนแก้ไข] แก้บั๊กจริง: เดิม minFontSize=11 ทำให้ถ้ามีแค่ "1 ช่อง" ที่มีคำยาวมากๆ (เช่น "นักสังคมสงเคราะห์")
+        // ทั้งกระดานจะถูกบีบลงมาที่ 11px เท่ากันหมดทุกช่อง ทั้งที่อีก 24 ช่องมีพื้นที่พอจะใหญ่กว่านั้นมาก ทำให้ทั้งบอร์ดดูเล็กลงทั้งที่ไม่จำเป็น
+        // แก้โดยเพิ่ม floor ของรอบ "ทั้งกระดาน" เป็น 15px (ให้ส่วนใหญ่ยังคงใหญ่อ่านง่าย) แล้วปล่อยให้ช่องที่ยังล้นอยู่จริงๆ
+        // ไปรับการแก้แบบเฉพาะช่อง (ลดขนาดแค่ช่องนั้นช่องเดียว) ในขั้นตอนถัดไปด้านล่างแทน ไม่ต้องลากทั้งกระดานลงไปด้วย
+        const minFontSize = 15;
         let guard = 0;
 
         // [ส่วนแก้ไข] แก้บั๊กจริง: เดิมวัด overflow ขณะตัวหนังสือจัดกึ่งกลางแนวตั้ง-แนวนอนอยู่ (items-center/justify-center)
@@ -1051,7 +1054,7 @@
                 c.style.wordBreak = 'break-all';
                 c.style.overflowWrap = 'anywhere';
                 let soloSize = parseFloat(c.style.fontSize) || fontSize;
-                const hardFloor = 8; // ต่ำสุดจริงๆ เฉพาะเคสพิเศษนี้เท่านั้น (ทั้งกระดานยังคงใช้ minFontSize=11 ตามปกติ)
+                const hardFloor = 8; // ต่ำสุดจริงๆ เฉพาะเคสพิเศษนี้เท่านั้น (ทั้งกระดานยังคงใช้ minFontSize=15 ตามปกติ)
                 let g2 = 0;
                 while ((c.scrollHeight > c.clientHeight + 1 || c.scrollWidth > c.clientWidth + 1) && soloSize > hardFloor && g2 < 30) {
                     soloSize -= 0.5;
@@ -1064,8 +1067,11 @@
         textCells.forEach(c => { c.style.alignItems = ''; c.style.justifyContent = ''; }); // จัดกึ่งกลางกลับตามปกติ (กลับไปใช้ค่าจาก class .items-center/.justify-center เดิม)
     }
 
+    let boardCells = []; // [ส่วนเพิ่ม] เก็บ reference ปุ่มแต่ละช่องแบบ 2 มิติ [r][c] ไว้ใช้หาแนวที่บิงโกได้ตอนเกมจบ
+
     function renderBingoBoard() {
-        // [ส่วนเพิ่ม] ทุกครั้งที่กระดานถูก render ใหม่ (การ์ดใหม่/รอบใหม่) ให้ปุ่ม BINGO กลับมาใช้งานได้ตามปกติ
+        // [ส่วนเพิ่ม] ทุกครั้งที่กระดานถูก render ใหม่ (การ์ดใหม่/รอบใหม่) ให้ปุ่ม BINGO กลับมาใช้งานได้ตามปกติ และปลดล็อกกระดานให้กดติ๊กได้ตามปกติ
+        boardLocked = false;
         const bingoBtn = document.getElementById('btn-bingo');
         if (bingoBtn) {
             bingoBtn.disabled = false;
@@ -1080,6 +1086,7 @@
         // แก้โดยกำหนด grid-rows-${boardSize} ให้เท่ากับ grid-cols-${boardSize} บังคับทุกแถว/คอลัมน์ขนาดเท่ากันเป๊ะ ได้ช่องสี่เหลี่ยมจัตุรัสสม่ำเสมอทั้งกระดาน
         board.className = `grid grid-cols-${boardSize} grid-rows-${boardSize} gap-1 sm:gap-1.5 mb-4 w-full aspect-square rounded-2xl bg-slate-900 p-1 sm:p-1.5 border-2 border-slate-600`;
         board.innerHTML = '';
+        boardCells = []; // เคลียร์ของเก่าทุกครั้งที่ build กระดานใหม่
 
         const textCells = []; // เก็บเฉพาะช่องที่มีตัวหนังสือ (ไม่รวมช่อง FREE ที่เป็นรูปโลโก้) ไว้คำนวณไซซ์ร่วมกัน
 
@@ -1088,8 +1095,10 @@
         const CELL_STYLE = { bg: '#f0f9ff', border: '#0284c7', text: '#0c4a6e' }; // ฟ้าอ่อนสบายตา ขอบ/ตัวหนังสือฟ้าเข้ม (โทนเดียวกับแบรนด์ของแอป)
 
         myCard.forEach((row, r) => {
+            boardCells[r] = [];
             row.forEach((val, c) => {
                 const cell = document.createElement('button');
+                boardCells[r][c] = cell; // [ส่วนเพิ่ม] เก็บ reference ไว้หาแนวที่บิงโกได้ทีหลัง
                 const isFree = val === "FREE";
                 // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด minFontSize แล้วยังไม่พอดี
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
@@ -1130,6 +1139,7 @@
                 }
 
                 if (!isFree) cell.onclick = () => {
+                    if (boardLocked) return; // [ส่วนเพิ่ม] BINGO ไปแล้วในรอบนี้ ห้ามกดติ๊ก/ถอนติ๊กช่องใดๆ ต่ออีก กันสถานะที่ใช้อ้างอิงแนวที่บิงโกเปลี่ยนไป
                     if (drawnHistory.includes(val)) {
                         cell.classList.toggle('cell-marked');
                         if (cell.classList.contains('cell-marked')) {
@@ -1360,12 +1370,50 @@
     }
 
     // [ส่วนปรับแก้] เมื่อ BINGO สำเร็จ ให้เปิดปุ่ม Floating รับของรางวัล (รูปแบบ B)
+    // [ส่วนเพิ่ม] หลัง BINGO สำเร็จ: ล็อกกระดาน + หาแนวที่บิงโกจริง (แถว/คอลัมน์/ทแยง) จากช่องที่ติ๊กไว้ แล้วเน้นแนวนั้นเด่นชัด พร้อมทำช่องอื่นให้จางลง
+    // เพื่อให้ตอบได้ทันทีว่าบิงโกแนวไหน (เผื่อพิธีกร/แอดมินถามยืนยัน) และกันสถานะเปลี่ยนไปหลังชนะแล้ว
+    function lockBoardAfterWin() {
+        boardLocked = true;
+        if (!boardCells.length) return;
+        const size = boardCells.length;
+        const winCellSet = new Set();
+
+        for (let r = 0; r < size; r++) {
+            if (boardCells[r].every(c => c.classList.contains('cell-marked'))) {
+                boardCells[r].forEach(c => winCellSet.add(c));
+            }
+        }
+        for (let c = 0; c < size; c++) {
+            let allMarked = true;
+            for (let r = 0; r < size; r++) if (!boardCells[r][c].classList.contains('cell-marked')) { allMarked = false; break; }
+            if (allMarked) for (let r = 0; r < size; r++) winCellSet.add(boardCells[r][c]);
+        }
+        let diag1 = true, diag2 = true;
+        for (let i = 0; i < size; i++) {
+            if (!boardCells[i][i].classList.contains('cell-marked')) diag1 = false;
+            if (!boardCells[i][size - 1 - i].classList.contains('cell-marked')) diag2 = false;
+        }
+        if (diag1) for (let i = 0; i < size; i++) winCellSet.add(boardCells[i][i]);
+        if (diag2) for (let i = 0; i < size; i++) winCellSet.add(boardCells[i][size - 1 - i]);
+
+        boardCells.forEach(row => row.forEach(c => {
+            if (c.classList.contains('cell-free')) return; // ช่องโลโก้ปล่อยไว้ตามปกติ ไม่ต้องทำให้จาง
+            if (winCellSet.has(c)) {
+                c.style.boxShadow = 'inset 0 0 0 3px #f59e0b, 0 0 14px rgba(245, 158, 11, 0.65)'; // ไฮไลต์ทองเด่นชัดตรงแนวที่บิงโก
+            } else {
+                c.style.opacity = '0.35';
+                c.style.filter = 'grayscale(70%)'; // ช่องอื่นๆ ที่ไม่ได้อยู่ในแนวที่บิงโก ทำให้จางลงเห็นชัดว่าไม่เกี่ยวข้อง
+            }
+        }));
+    }
+
     socket.on('bingo-verified-winner', (data) => {
         confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
         if (navigator.vibrate) navigator.vibrate([100, 60, 100, 60, 200]); // สั่นฉลองแรงกว่าปกติเฉพาะเครื่องผู้ชนะ
         hasPendingReward = true; // ห้ามให้ game-reset รีโหลดหน้าทิ้งจนกว่าจะกรอกที่อยู่เสร็จ
         document.getElementById('btn-floating-reward').classList.remove('hidden');
         openRewardChoiceModal();
+        lockBoardAfterWin(); // [ส่วนเพิ่ม] ล็อกกระดาน กันกดติ๊ก/ถอนติ๊กช่องอื่นต่อ พร้อมเน้นแนวที่บิงโกให้เห็นชัดเจน
 
         // [ส่วนเพิ่ม] ปุ่ม BINGO เปลี่ยนเป็นสีเทาและกดซ้ำไม่ได้ เพราะผู้เล่นชนะไปแล้วในรอบนี้ (จะเปิดใช้งานใหม่อัตโนมัติเมื่อได้การ์ดใบใหม่ในรอบถัดไป)
         const bingoBtn = document.getElementById('btn-bingo');
