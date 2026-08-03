@@ -481,6 +481,9 @@
         Object.values(_applauseAudioCache).forEach((a) => {
             try { a.pause(); a.currentTime = 0; } catch (e) { /* เงียบไว้ */ }
         });
+        // [ส่วนแก้ไข] แก้บั๊กจริงเดียวกับฝั่งผู้เล่น: เพิ่ม suspend() audioCtx หยุดเสียงสังเคราะห์ (WebAudio) ที่กำลังเล่นอยู่ด้วย
+        // ไม่ใช่แค่ไฟล์เสียงจริงเท่านั้น (ถ้ายังไม่ได้อัปโหลดไฟล์เสียงจริง ระบบจะเล่นเสียงสังเคราะห์อยู่เสมอ)
+        try { if (audioCtx.state === 'running') audioCtx.suspend(); } catch (e) { /* เงียบไว้ */ }
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         socket.emit('admin-stop-sfx');
     }
