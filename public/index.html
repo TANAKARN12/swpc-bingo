@@ -181,7 +181,7 @@
             <div class="text-center min-w-0">
                 <h1 class="text-lg sm:text-2xl font-extrabold text-cyan-400 truncate">สภาวิชาชีพสังคมสงเคราะห์</h1>
                 <p class="text-xs text-slate-400">SWPC BINGO ONLINE</p>
-                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-b</p>
+                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-c</p>
             </div>
             <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 text-amber-300 border-2 border-amber-500/50 rounded-full shadow-md text-base sm:text-lg font-black transition active:scale-90">
                 🏆
@@ -1109,7 +1109,9 @@
     // ผลลัพธ์: กระดานส่วนใหญ่ได้ตัวอักษรใหญ่สุดเท่าที่จะเป็นไปได้จริงๆ ไม่ถูกลากลงเพราะคำยากไม่กี่คำอีกต่อไป
     function fitBoardTextUniformly(textCells, size) {
         if (!textCells.length) return;
-        const ceilBySize = { 3: 30, 4: 27, 5: 24, 6: 20 }; // [ปรับปรุง] เพิ่มเพดานบนสุดให้สูงขึ้น เผื่อพื้นที่ให้ตัวอักษรใหญ่ขึ้นอีก
+        // [ปรับปรุง] ผู้ใช้ยืนยันว่ายอมรับได้เต็มที่ให้ขึ้น 2-3 บรรทัดในกรอบเดียวกัน ดังนั้นดันขนาดให้ใหญ่ขึ้นอีกอย่างจริงจัง
+        // เพิ่มเพดานบนสุด และขยับเปอร์เซ็นไทล์จาก 40 เป็น 60 (ให้ตัวอักษรใหญ่ขึ้นสำหรับ ~40% ของช่อง ยอมให้ ~60% ที่เหลือไปรับการจัดการเฉพาะช่องแทน)
+        const ceilBySize = { 3: 34, 4: 30, 5: 27, 6: 22 };
         const absoluteMax = ceilBySize[size] || ceilBySize[3];
         const absoluteMin = 10; // ไซซ์ต่ำสุดที่ยัง "ยอมรับได้" สำหรับไซซ์รวมของทั้งกระดาน (คำยากพิเศษไปรับ hardFloor ที่ต่ำกว่านี้ได้อีกทีด้านล่าง)
 
@@ -1122,11 +1124,13 @@
 
         // หาไซซ์ใหญ่สุดที่ "ช่องนี้ช่องเดียว" พอดีกรอบตัวเอง ด้วย binary search (เทียบกับไล่ทีละ 0.5px ทั้งกระดานแบบเดิม เร็วกว่ามากและแม่นยำกว่าด้วย)
         function findBestFitForCell(c) {
+            c.style.fontSize = absoluteMax + 'px'; // [ส่วนแก้ไข] ลองไซซ์สูงสุดก่อนเลย เผื่อคำสั้นๆ พอดีอยู่แล้วตั้งแต่แรก (เดิมเริ่มจาก absoluteMin ทำให้เสียเวลา iterations โดยไม่จำเป็น)
+            if (!isOverflowing(c)) return absoluteMax;
             c.style.fontSize = absoluteMin + 'px';
             if (isOverflowing(c)) return absoluteMin; // คำยากสุดๆ แม้ไซซ์ต่ำสุดก็ยังไม่พอ ปล่อยให้ขั้นตอนถัดไปจัดการเป็นพิเศษ
             let lo = absoluteMin, hi = absoluteMax, best = absoluteMin;
             let guard = 0;
-            while (hi - lo > 0.5 && guard < 12) {
+            while (hi - lo > 0.5 && guard < 14) {
                 const mid = (lo + hi) / 2;
                 c.style.fontSize = mid + 'px';
                 if (isOverflowing(c)) { hi = mid; } else { lo = mid; best = mid; }
@@ -1137,9 +1141,9 @@
 
         const perCellBest = textCells.map(findBestFitForCell);
 
-        // เลือกไซซ์ของทั้งกระดานจากเปอร์เซ็นไทล์ที่ 40 ของช่องทั้งหมด (ตัดผลกระทบจากคำยากส่วนน้อยออกไป แต่ยอมให้ใหญ่ขึ้นกว่าเดิม)
+        // เลือกไซซ์ของทั้งกระดานจากเปอร์เซ็นไทล์ที่ 60 ของช่องทั้งหมด (ดันให้ใหญ่ขึ้นชัดเจนกว่ารอบก่อน)
         const sorted = [...perCellBest].sort((a, b) => a - b);
-        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.4));
+        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.6));
         let uniformSize = Math.floor(sorted[percentileIdx] * 2) / 2; // ปัดลงทีละ 0.5px กันคลาดเคลื่อนจากการปัดเศษ
 
         textCells.forEach(c => { c.style.fontSize = uniformSize + 'px'; });
@@ -1210,7 +1214,7 @@
                 const isFree = val === "FREE";
                 // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด hardFloor แล้วยังไม่พอดี
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
-                cell.className = `w-full h-full font-black p-1.5 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
+                cell.className = `w-full h-full font-black p-1 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
                 if (!isFree) {
                     cell.style.background = CELL_STYLE.bg;
                     cell.style.color = CELL_STYLE.text;
