@@ -181,7 +181,7 @@
             <div class="text-center min-w-0">
                 <h1 class="text-lg sm:text-2xl font-extrabold text-cyan-400 truncate">สภาวิชาชีพสังคมสงเคราะห์</h1>
                 <p class="text-xs text-slate-400">SWPC BINGO ONLINE</p>
-                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-d</p>
+                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-e</p>
             </div>
             <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 text-amber-300 border-2 border-amber-500/50 rounded-full shadow-md text-base sm:text-lg font-black transition active:scale-90">
                 🏆
@@ -1113,7 +1113,7 @@
         // เพิ่มเพดานบนสุด และขยับเปอร์เซ็นไทล์จาก 40 เป็น 60 (ให้ตัวอักษรใหญ่ขึ้นสำหรับ ~40% ของช่อง ยอมให้ ~60% ที่เหลือไปรับการจัดการเฉพาะช่องแทน)
         // [ปรับปรุง] ผู้เล่นส่วนใหญ่เป็นผู้สูงอายุ ต้องการตัวอักษรใหญ่ที่สุดเท่าที่จะทำได้จริงๆ ดันเปอร์เซ็นไทล์ขึ้นอีกจาก 60 เป็น 78
         // และเพิ่มเพดานบนสุดขึ้นอีก พร้อมลด padding/gap รอบกระดานทั้งหมดให้เหลือน้อยที่สุดเท่าที่ยังดูเป็นระเบียบ เพื่อคืนพื้นที่ทุกพิกเซลให้ตัวอักษร
-        const ceilBySize = { 3: 38, 4: 34, 5: 30, 6: 25 };
+        const ceilBySize = { 3: 46, 4: 41, 5: 36, 6: 30 };
         const absoluteMax = ceilBySize[size] || ceilBySize[3];
         const absoluteMin = 11; // ไซซ์ต่ำสุดที่ยัง "ยอมรับได้" สำหรับไซซ์รวมของทั้งกระดาน (คำยากพิเศษไปรับ hardFloor ที่ต่ำกว่านี้ได้อีกทีด้านล่าง)
 
@@ -1145,7 +1145,7 @@
 
         // เลือกไซซ์ของทั้งกระดานจากเปอร์เซ็นไทล์ที่ 78 ของช่องทั้งหมด (ดันให้ใหญ่ที่สุดเท่าที่ปลอดภัย)
         const sorted = [...perCellBest].sort((a, b) => a - b);
-        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.78));
+        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.88));
         let uniformSize = Math.floor(sorted[percentileIdx] * 2) / 2; // ปัดลงทีละ 0.5px กันคลาดเคลื่อนจากการปัดเศษ
 
         textCells.forEach(c => { c.style.fontSize = uniformSize + 'px'; });
@@ -1216,7 +1216,7 @@
                 const isFree = val === "FREE";
                 // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด hardFloor แล้วยังไม่พอดี
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
-                cell.className = `w-full h-full font-black p-1 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
+                cell.className = `w-full h-full font-black p-0.5 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
                 if (!isFree) {
                     cell.style.background = CELL_STYLE.bg;
                     cell.style.color = CELL_STYLE.text;
@@ -1227,7 +1227,7 @@
                 cell.style.wordBreak = 'normal';
                 cell.style.overflowWrap = 'break-word';
                 // [ส่วนแก้ไข] ปรับจาก 1.5 ลงมาเป็น 1.4 (ยังเผื่อพื้นที่ให้สระบน-ล่าง/วรรณยุกต์ไทยพอเพียง แต่คืนพื้นที่แนวตั้งบางส่วนให้ตัวอักษรใหญ่ขึ้นได้)
-                cell.style.lineHeight = '1.3';
+                cell.style.lineHeight = '1.15';
 
                 // [ส่วนเพิ่ม] ช่อง FREE เปลี่ยนจากตัวหนังสือ "FREE" เป็นโลโก้สภาวิชาชีพฯ แทน
                 // วิธีติดตั้ง: นำไฟล์โลโก้ (พื้นหลังโปร่งใสจะสวยที่สุด) วางไว้ที่ public/images/council-logo.png ของโปรเจกต์
