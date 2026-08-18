@@ -181,7 +181,7 @@
             <div class="text-center min-w-0">
                 <h1 class="text-lg sm:text-2xl font-extrabold text-cyan-400 truncate">สภาวิชาชีพสังคมสงเคราะห์</h1>
                 <p class="text-xs text-slate-400">SWPC BINGO ONLINE</p>
-                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-03-a</p>
+                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-a</p>
             </div>
             <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 text-amber-300 border-2 border-amber-500/50 rounded-full shadow-md text-base sm:text-lg font-black transition active:scale-90">
                 🏆
@@ -1143,19 +1143,30 @@
 
         textCells.forEach(c => { c.style.fontSize = uniformSize + 'px'; });
 
-        // [คงไว้] คำประสมยาวๆ ที่ไม่มีจุดตัดตามหลักภาษาไทยเลย (เช่น "นักสังคมสงเคราะห์") อาจยังล้นอยู่แม้ที่ไซซ์รวมแล้ว
-        // ให้จัดการเฉพาะช่องนั้น: ยอมตัดคำได้ทุกตัวอักษรเป็นทางเลือกสุดท้ายจริงๆ พร้อมลดขนาดเฉพาะช่องนั้นต่อจนพอดี ไม่กระทบช่องอื่น
+        // [ส่วนแก้ไข] แก้บั๊กจริงที่ยังพบอยู่: เดิมพอช่องไหนล้นก็เปลี่ยนเป็น word-break:break-all ทันที ซึ่งไปทับ/มองข้ามจุดตัดพยางค์ที่แทรกไว้อย่างตั้งใจ (zwsp)
+        // จาก insertThaiBreakOpportunities() ด้านบนจนหมด ทำให้เบราว์เซอร์กลับไปตัดตามความกว้างล้วนๆ เหมือนเดิม เกิดเศษตัวอักษรโดดๆ อีกครั้ง
+        // แก้โดยลองลดขนาดฟอนต์ "เฉพาะช่องนั้น" อย่างเดียวก่อน (word-break ยังเป็น normal เคารพจุดตัดพยางค์ตามปกติ) ให้สุดทางจริงๆ ก่อน
+        // แล้วค่อยยอมตัดได้ทุกตัวอักษรเป็นทางเลือกสุดท้ายจริงๆ เฉพาะกรณีที่ลดจนสุดแล้วยังไม่พอดีอีกเท่านั้น (ควรเกิดน้อยมากหลังแก้จุดนี้)
         textCells.forEach(c => {
             if (isOverflowing(c)) {
-                c.style.wordBreak = 'break-all';
-                c.style.overflowWrap = 'anywhere';
                 let soloSize = uniformSize;
-                const hardFloor = 8;
+                const hardFloor = 9; // ลองลดขนาดอย่างเดียวก่อน โดยยังเคารพจุดตัดพยางค์ (word-break: normal เดิม)
                 let g2 = 0;
                 while (isOverflowing(c) && soloSize > hardFloor && g2 < 30) {
                     soloSize -= 0.5;
                     c.style.fontSize = soloSize + 'px';
                     g2++;
+                }
+                if (isOverflowing(c)) {
+                    // ทางเลือกสุดท้ายจริงๆ: คำยากสุดๆ ที่แม้ลดฟอนต์จนถึง hardFloor แล้วก็ยังไม่พอดี ค่อยยอมตัดได้ทุกตัวอักษร
+                    c.style.wordBreak = 'break-all';
+                    c.style.overflowWrap = 'anywhere';
+                    const absoluteFloor = 7;
+                    while (isOverflowing(c) && soloSize > absoluteFloor && g2 < 60) {
+                        soloSize -= 0.5;
+                        c.style.fontSize = soloSize + 'px';
+                        g2++;
+                    }
                 }
             }
         });

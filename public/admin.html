@@ -42,7 +42,7 @@
                         แผงควบคุมคณะกรรมการกลาง SWPC
                     </h1>
                     <p class="text-xs md:text-sm text-slate-400">ระบบควบคุมการจัดกิจกรรมบิงโกออนไลน์ สภาวิชาชีพสังคมสงเคราะห์</p>
-                    <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-03-a</p>
+                    <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-a</p>
                 </div>
             </div>
             
@@ -498,7 +498,11 @@
                 base.preload = 'auto';
                 _applauseAudioCache[src] = base;
             }
-            const player = base.cloneNode();
+            // [ส่วนแก้ไข] แก้บั๊กจริง: เดิม clone element ใหม่ทุกครั้งที่เล่น ทำให้ element ที่เล่นจริงไม่เคยถูกเก็บใน _applauseAudioCache เลย
+            // พอกดปุ่ม "หยุดเสียง" ระบบไปสั่ง pause() ที่ element ต้นฉบับซึ่งไม่เคยเล่นอยู่แล้ว เสียงที่กำลังเล่นจริง (ตัวโคลน) เลยไม่หยุดสักที
+            // แก้โดยใช้ element เดิมเล่นซ้ำโดยตรง (เหมือนที่แก้ไปแล้วฝั่งผู้เล่น) ตอนนี้ปุ่มหยุดเสียงจะเข้าถึง element ที่เล่นจริงได้แน่นอน
+            const player = base;
+            player.currentTime = 0;
             player.volume = 0.9;
             let usedFallback = false;
             const doFallback = () => { if (!usedFallback && fallbackFn) { usedFallback = true; fallbackFn(); } };
