@@ -171,7 +171,7 @@
         <div id="display-winner-sub" class="text-base md:text-xl text-slate-800 mt-1"></div>
     </div>
 
-    <div id="app" class="w-full max-w-md bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl p-3 sm:p-5 border border-cyan-500/30 transition-all duration-300">
+    <div id="app" class="w-full max-w-md bg-slate-800/90 backdrop-blur-md rounded-3xl shadow-2xl p-2 sm:p-4 border border-cyan-500/30 transition-all duration-300">
         
         <div id="header-brand" class="flex items-center justify-between gap-2 mb-4">
             <!-- [ส่วนแก้ไข] ย้ายปุ่มกติกา/ตัวอย่างการชนะ จากลอยทับกระดาน มาฝังซ้าย-ขวาของชื่อสภาฯ แทน อ่านง่ายขึ้น ไม่บังเนื้อหา -->
@@ -181,7 +181,7 @@
             <div class="text-center min-w-0">
                 <h1 class="text-lg sm:text-2xl font-extrabold text-cyan-400 truncate">สภาวิชาชีพสังคมสงเคราะห์</h1>
                 <p class="text-xs text-slate-400">SWPC BINGO ONLINE</p>
-                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-c</p>
+                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-d</p>
             </div>
             <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 text-amber-300 border-2 border-amber-500/50 rounded-full shadow-md text-base sm:text-lg font-black transition active:scale-90">
                 🏆
@@ -244,7 +244,7 @@
                 <div id="avatar-lobby" class="flex flex-wrap justify-center gap-3 bg-slate-900/60 p-4 rounded-xl border border-slate-700/50 max-h-48 overflow-y-auto"></div>
             </div>
 
-            <div id="game-board-area" class="hidden space-bg p-2.5 md:p-4">
+            <div id="game-board-area" class="hidden space-bg p-1.5 md:p-3">
                 <div class="bg-slate-900/60 backdrop-blur-sm p-3 rounded-2xl text-center mb-2 border border-cyan-500/30 relative">
                     <!-- [ส่วนเพิ่ม] สลับเสียงอ่านคำศัพท์บนมือถือผู้เล่นแต่ละคนเอง (เดิมมีแค่บนจอกลาง ทำให้ผู้เล่นไม่ได้ยินเสียงอ่านคำเลย) -->
                     <label class="absolute top-2 right-2 flex items-center gap-1 text-[10px] text-slate-300 cursor-pointer bg-slate-800/70 px-2 py-1 rounded-full border border-slate-600/60">
@@ -1111,9 +1111,11 @@
         if (!textCells.length) return;
         // [ปรับปรุง] ผู้ใช้ยืนยันว่ายอมรับได้เต็มที่ให้ขึ้น 2-3 บรรทัดในกรอบเดียวกัน ดังนั้นดันขนาดให้ใหญ่ขึ้นอีกอย่างจริงจัง
         // เพิ่มเพดานบนสุด และขยับเปอร์เซ็นไทล์จาก 40 เป็น 60 (ให้ตัวอักษรใหญ่ขึ้นสำหรับ ~40% ของช่อง ยอมให้ ~60% ที่เหลือไปรับการจัดการเฉพาะช่องแทน)
-        const ceilBySize = { 3: 34, 4: 30, 5: 27, 6: 22 };
+        // [ปรับปรุง] ผู้เล่นส่วนใหญ่เป็นผู้สูงอายุ ต้องการตัวอักษรใหญ่ที่สุดเท่าที่จะทำได้จริงๆ ดันเปอร์เซ็นไทล์ขึ้นอีกจาก 60 เป็น 78
+        // และเพิ่มเพดานบนสุดขึ้นอีก พร้อมลด padding/gap รอบกระดานทั้งหมดให้เหลือน้อยที่สุดเท่าที่ยังดูเป็นระเบียบ เพื่อคืนพื้นที่ทุกพิกเซลให้ตัวอักษร
+        const ceilBySize = { 3: 38, 4: 34, 5: 30, 6: 25 };
         const absoluteMax = ceilBySize[size] || ceilBySize[3];
-        const absoluteMin = 10; // ไซซ์ต่ำสุดที่ยัง "ยอมรับได้" สำหรับไซซ์รวมของทั้งกระดาน (คำยากพิเศษไปรับ hardFloor ที่ต่ำกว่านี้ได้อีกทีด้านล่าง)
+        const absoluteMin = 11; // ไซซ์ต่ำสุดที่ยัง "ยอมรับได้" สำหรับไซซ์รวมของทั้งกระดาน (คำยากพิเศษไปรับ hardFloor ที่ต่ำกว่านี้ได้อีกทีด้านล่าง)
 
         // [คงไว้] แก้บั๊กจริงเรื่องการวัด overflow ขณะจัดกึ่งกลาง (Safari/iOS วัดไม่แม่นยำ) ด้วยการจัดชิดบน-ชิดซ้ายชั่วคราวระหว่างวัด
         textCells.forEach(c => { c.style.alignItems = 'flex-start'; c.style.justifyContent = 'flex-start'; });
@@ -1141,9 +1143,9 @@
 
         const perCellBest = textCells.map(findBestFitForCell);
 
-        // เลือกไซซ์ของทั้งกระดานจากเปอร์เซ็นไทล์ที่ 60 ของช่องทั้งหมด (ดันให้ใหญ่ขึ้นชัดเจนกว่ารอบก่อน)
+        // เลือกไซซ์ของทั้งกระดานจากเปอร์เซ็นไทล์ที่ 78 ของช่องทั้งหมด (ดันให้ใหญ่ที่สุดเท่าที่ปลอดภัย)
         const sorted = [...perCellBest].sort((a, b) => a - b);
-        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.6));
+        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.78));
         let uniformSize = Math.floor(sorted[percentileIdx] * 2) / 2; // ปัดลงทีละ 0.5px กันคลาดเคลื่อนจากการปัดเศษ
 
         textCells.forEach(c => { c.style.fontSize = uniformSize + 'px'; });
@@ -1196,7 +1198,7 @@
         // [ส่วนแก้ไข] แก้บั๊กจริง: เดิมกำหนดแค่ grid-cols แต่ไม่ได้กำหนด grid-rows ทำให้แต่ละแถวสูงไม่เท่ากันตามเนื้อหา (แถวที่มีคำยาวขึ้นหลายบรรทัดจะสูงกว่าแถวอื่น)
         // ผลคือช่องมีสัดส่วนไม่เท่ากันทั้งกระดาน แถมทำให้ตัวชี้วัดขนาดฟอนต์ (fitBoardTextUniformly) วัดพื้นที่ผิดจนบีบฟอนต์เล็กเกินจำเป็น
         // แก้โดยกำหนด grid-rows-${boardSize} ให้เท่ากับ grid-cols-${boardSize} บังคับทุกแถว/คอลัมน์ขนาดเท่ากันเป๊ะ ได้ช่องสี่เหลี่ยมจัตุรัสสม่ำเสมอทั้งกระดาน
-        board.className = `grid grid-cols-${boardSize} grid-rows-${boardSize} gap-1 sm:gap-1.5 mb-4 w-full aspect-square rounded-2xl bg-slate-900 p-1 sm:p-1.5 border-2 border-slate-600`;
+        board.className = `grid grid-cols-${boardSize} grid-rows-${boardSize} gap-0.5 sm:gap-1 mb-4 w-full aspect-square rounded-2xl bg-slate-900 p-0.5 sm:p-1 border-2 border-slate-600`;
         board.innerHTML = '';
         boardCells = []; // เคลียร์ของเก่าทุกครั้งที่ build กระดานใหม่
 
@@ -1225,7 +1227,7 @@
                 cell.style.wordBreak = 'normal';
                 cell.style.overflowWrap = 'break-word';
                 // [ส่วนแก้ไข] ปรับจาก 1.5 ลงมาเป็น 1.4 (ยังเผื่อพื้นที่ให้สระบน-ล่าง/วรรณยุกต์ไทยพอเพียง แต่คืนพื้นที่แนวตั้งบางส่วนให้ตัวอักษรใหญ่ขึ้นได้)
-                cell.style.lineHeight = '1.4';
+                cell.style.lineHeight = '1.3';
 
                 // [ส่วนเพิ่ม] ช่อง FREE เปลี่ยนจากตัวหนังสือ "FREE" เป็นโลโก้สภาวิชาชีพฯ แทน
                 // วิธีติดตั้ง: นำไฟล์โลโก้ (พื้นหลังโปร่งใสจะสวยที่สุด) วางไว้ที่ public/images/council-logo.png ของโปรเจกต์
