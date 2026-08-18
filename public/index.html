@@ -9,7 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Sarabun', sans-serif; background: #0f172a; }
         .cell-marked { background: #10b981 !important; color: white !important; font-weight: bold; outline: 2px solid #059669; outline-offset: -2px; }
@@ -181,7 +181,7 @@
             <div class="text-center min-w-0">
                 <h1 class="text-lg sm:text-2xl font-extrabold text-cyan-400 truncate">สภาวิชาชีพสังคมสงเคราะห์</h1>
                 <p class="text-xs text-slate-400">SWPC BINGO ONLINE</p>
-                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-a</p>
+                <p class="text-[9px] text-slate-600 mt-0.5">build 2026-08-18-b</p>
             </div>
             <button id="btn-pattern-preview" onclick="openPatternPreviewModal()" title="ตัวอย่างรูปแบบการชนะ" class="flex-shrink-0 w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center bg-gradient-to-br from-slate-700 to-slate-900 hover:from-slate-600 hover:to-slate-800 text-amber-300 border-2 border-amber-500/50 rounded-full shadow-md text-base sm:text-lg font-black transition active:scale-90">
                 🏆
@@ -1103,12 +1103,13 @@
     //
     // วิธีใหม่ (แม่นยำและฉลาดกว่า):
     // 1) วัด "ไซซ์ที่ใหญ่ที่สุดที่ช่องนั้นพอดีด้วยตัวเอง" แยกเป็นรายช่อง ด้วยวิธี binary search (เร็วและแม่นยำกว่าการลดทีละ 0.5px ไล่ทั้งกระดาน)
-    // 2) เรียงไซซ์ที่ได้จากน้อยไปมาก แล้วเลือก "ไซซ์ของทั้งกระดาน" จากเปอร์เซ็นไทล์ที่ 20 (ให้ 80% ของช่องได้ไซซ์นี้แบบสบายๆ ไม่ต้องบีบ)
-    //    คำยากส่วนน้อย (~20%) ที่เหลือ จะไปรับการจัดการเฉพาะช่อง (ตัดคำได้ทุกตัวอักษร + ลดขนาดแค่ช่องนั้น) แทนการลากทั้งบอร์ดลงไปด้วย
+    // 2) เรียงไซซ์ที่ได้จากน้อยไปมาก แล้วเลือก "ไซซ์ของทั้งกระดาน" จากเปอร์เซ็นไทล์ที่ 40 (ให้ ~60% ของช่องได้ไซซ์นี้แบบสบายๆ ไม่ต้องบีบ)
+    //    [ปรับปรุง] เดิมใช้เปอร์เซ็นไทล์ที่ 20 ระมัดระวังเกินไปจนตัวอักษรดูเล็ก ตอนนี้ยอมให้คำยากส่วนน้อย (~40%) ไปรับการจัดการเฉพาะช่องแทน
+    //    (ปลอดภัยแล้วเพราะแก้ระบบ escalation ให้ลดฟอนต์เฉพาะช่องก่อนเสมอ ไม่กระโดดไป break-all ทันทีเหมือนเดิม) แลกกับตัวอักษรที่ใหญ่ขึ้นชัดเจนสำหรับส่วนใหญ่ของกระดาน
     // ผลลัพธ์: กระดานส่วนใหญ่ได้ตัวอักษรใหญ่สุดเท่าที่จะเป็นไปได้จริงๆ ไม่ถูกลากลงเพราะคำยากไม่กี่คำอีกต่อไป
     function fitBoardTextUniformly(textCells, size) {
         if (!textCells.length) return;
-        const ceilBySize = { 3: 26, 4: 23, 5: 21, 6: 18 };
+        const ceilBySize = { 3: 30, 4: 27, 5: 24, 6: 20 }; // [ปรับปรุง] เพิ่มเพดานบนสุดให้สูงขึ้น เผื่อพื้นที่ให้ตัวอักษรใหญ่ขึ้นอีก
         const absoluteMax = ceilBySize[size] || ceilBySize[3];
         const absoluteMin = 10; // ไซซ์ต่ำสุดที่ยัง "ยอมรับได้" สำหรับไซซ์รวมของทั้งกระดาน (คำยากพิเศษไปรับ hardFloor ที่ต่ำกว่านี้ได้อีกทีด้านล่าง)
 
@@ -1136,9 +1137,9 @@
 
         const perCellBest = textCells.map(findBestFitForCell);
 
-        // เลือกไซซ์ของทั้งกระดานจากเปอร์เซ็นไทล์ที่ 20 ของช่องทั้งหมด (ตัดผลกระทบจากคำยากส่วนน้อยออกไป)
+        // เลือกไซซ์ของทั้งกระดานจากเปอร์เซ็นไทล์ที่ 40 ของช่องทั้งหมด (ตัดผลกระทบจากคำยากส่วนน้อยออกไป แต่ยอมให้ใหญ่ขึ้นกว่าเดิม)
         const sorted = [...perCellBest].sort((a, b) => a - b);
-        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.2));
+        const percentileIdx = Math.min(sorted.length - 1, Math.floor(sorted.length * 0.4));
         let uniformSize = Math.floor(sorted[percentileIdx] * 2) / 2; // ปัดลงทีละ 0.5px กันคลาดเคลื่อนจากการปัดเศษ
 
         textCells.forEach(c => { c.style.fontSize = uniformSize + 'px'; });
@@ -1209,7 +1210,7 @@
                 const isFree = val === "FREE";
                 // overflow-hidden คือตาข่ายรองรับชั้นสุดท้าย กันข้อความหลุดกรอบแม้ในเคสที่ลดฟอนต์จนสุด hardFloor แล้วยังไม่พอดี
                 // [ส่วนเพิ่ม] whitespace-normal + break-words ให้คำยาวขึ้นบรรทัดใหม่ได้แทนการบีบฟอนต์เล็กจิ๋วช่องเดียว
-                cell.className = `w-full h-full font-extrabold p-1.5 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
+                cell.className = `w-full h-full font-black p-1.5 flex items-center justify-center text-center transition overflow-hidden whitespace-normal break-words rounded-lg ${isFree ? 'cell-marked cell-free' : ''}`;
                 if (!isFree) {
                     cell.style.background = CELL_STYLE.bg;
                     cell.style.color = CELL_STYLE.text;
